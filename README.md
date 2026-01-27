@@ -13,12 +13,16 @@
 2. Create `.env.local` with:
    - `VITE_GOOGLE_CLIENT_ID` (Google OAuth client ID)
    - `GEMINI_API_KEY` (Gemini API key; server-side only)
-3. Run the app:
-   `npm run dev`
+   - `DATABASE_URL` (Postgres connection string; used to record login/logout events)
+3. Run the app (recommended):
+   `vercel dev`
 
-Note: the AI insight calls a Vercel Serverless Function at `/api/analyze`. For local end-to-end testing of that function, run the project with Vercel's dev server (recommended):
-- Install Vercel CLI: `npm i -g vercel`
-- Run: `vercel dev`
+Note: this project relies on Vercel Serverless Functions under `/api` for:
+- mandatory auth gating (`/api/auth/verify`)
+- login/logout auditing (`/api/auth/event`)
+- AI insights (`/api/analyze`)
+
+`npm run dev` will start only the Vite frontend and those `/api/*` routes will not exist.
 
 ## Vercel deployment (recommended)
 

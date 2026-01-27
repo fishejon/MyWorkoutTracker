@@ -40,6 +40,7 @@ const App: React.FC = () => {
     }
   });
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
+  const [authError, setAuthError] = useState<string | null>(null);
   const [user, setUser] = useState<AuthedUser | null>(null);
 
   const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
@@ -48,6 +49,7 @@ const App: React.FC = () => {
     setIdToken(null);
     setUser(null);
     setAuthStatus('unauth');
+    setAuthError(null);
     setStorageNamespace(null);
     setCircuits([]);
     setHistory([]);
@@ -79,11 +81,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!hasGoogleClientId) {
       setAuthStatus('unauth');
+      setAuthError(null);
       return;
     }
 
     if (!idToken) {
       setAuthStatus('unauth');
+      setAuthError(null);
       setUser(null);
       setStorageNamespace(null);
       return;
@@ -102,7 +106,12 @@ const App: React.FC = () => {
         });
 
         if (!resp.ok) {
-          if (!cancelled) clearSession();
+          if (!cancelled) {
+            if (resp.status === 404) {
+              setAuthError('Backend API not running. For local dev, run `vercel dev` (recommended).');
+            }
+            clearSession();
+          }
           return;
         }
 
@@ -235,6 +244,12 @@ const App: React.FC = () => {
             {authStatus === 'checking' ? 'Checking your session…' : 'Sign in to continue.'}
           </p>
 
+          {authError && (
+            <div className="text-left text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 mb-4">
+              {authError}
+            </div>
+          )}
+
           <div className="flex justify-center">
             <GoogleLogin
               onSuccess={(credentialResponse) => {
@@ -243,6 +258,7 @@ const App: React.FC = () => {
 
                 setIdToken(token);
                 setAuthStatus('checking');
+                setAuthError(null);
 
                 try {
                   sessionStorage.setItem(ID_TOKEN_STORAGE_KEY, token);
