@@ -87,7 +87,7 @@ const App: React.FC = () => {
 
     if (!idToken) {
       setAuthStatus('unauth');
-      setAuthError(null);
+      // Do not clear authError here; it may contain the reason verification failed.
       setUser(null);
       setStorageNamespace(null);
       return;
@@ -257,33 +257,36 @@ const App: React.FC = () => {
           )}
 
           <div className="flex justify-center">
-            <GoogleLogin
-              onSuccess={(credentialResponse) => {
-                const token = credentialResponse.credential;
-                if (!token) {
-                  setAuthError('Google did not return a credential. Check your OAuth client settings.');
-                  return;
-                }
+            {authStatus === 'checking' ? (
+              <div className="text-xs text-slate-500 font-semibold">Verifying…</div>
+            ) : (
+              <GoogleLogin
+                onSuccess={(credentialResponse) => {
+                  const token = credentialResponse.credential;
+                  if (!token) {
+                    setAuthError('Google did not return a credential. Check your OAuth client settings.');
+                    return;
+                  }
 
-                setAuthError(null);
-                setView('dashboard');
-                setIdToken(token);
-                setAuthStatus('checking');
+                  setAuthError(null);
+                  setIdToken(token);
+                  setAuthStatus('checking');
 
-                try {
-                  sessionStorage.setItem(ID_TOKEN_STORAGE_KEY, token);
-                } catch {
-                  // ignore
-                }
+                  try {
+                    sessionStorage.setItem(ID_TOKEN_STORAGE_KEY, token);
+                  } catch {
+                    // ignore
+                  }
 
-                void postAuthEvent('login', token);
-              }}
-              onError={() => {
-                setAuthError('Google login failed.');
-                console.error('Google login failed');
-              }}
-              useOneTap
-            />
+                  void postAuthEvent('login', token);
+                }}
+                onError={() => {
+                  setAuthError('Google login failed.');
+                  console.error('Google login failed');
+                }}
+                useOneTap
+              />
+            )}
           </div>
 
           <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
