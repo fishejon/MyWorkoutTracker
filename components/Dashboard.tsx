@@ -7,27 +7,31 @@ import { analyzeWorkoutProgress } from '../services/geminiService';
 interface DashboardProps {
   circuits: Circuit[];
   history: WorkoutSession[];
+  idToken: string | null;
   onStart: (selectedCircuits: Circuit[]) => void;
   onDelete: (id: string) => void;
   onNew: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ circuits, history, onStart, onDelete, onNew }) => {
+const Dashboard: React.FC<DashboardProps> = ({ circuits, history, idToken, onStart, onDelete, onNew }) => {
   const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [isLoadingInsight, setIsLoadingInsight] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchInsight = async () => {
-      if (history.length > 0) {
+      if (history.length > 0 && idToken) {
         setIsLoadingInsight(true);
-        const insight = await analyzeWorkoutProgress(history);
+        const insight = await analyzeWorkoutProgress(history, idToken);
         setAiInsight(insight);
         setIsLoadingInsight(false);
+      } else {
+        // Keep messaging simple; actual sign-in UI lives in the header.
+        setAiInsight(null);
       }
     };
     fetchInsight();
-  }, [history.length]);
+  }, [history.length, idToken]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
@@ -50,7 +54,9 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, onStart, onDel
           <h2 className="font-semibold">AI Progress Insight</h2>
         </div>
         <p className="text-indigo-50 text-sm leading-relaxed min-h-[40px]">
-          {isLoadingInsight ? "Analyzing your performance..." : aiInsight || "Build circuits and log workouts for personalized AI coaching."}
+          {isLoadingInsight
+            ? "Analyzing your performance..."
+            : aiInsight || (idToken ? "Build circuits and log workouts for personalized AI coaching." : "Sign in to enable AI insights.")}
         </p>
       </div>
 

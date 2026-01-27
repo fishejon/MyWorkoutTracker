@@ -2,19 +2,35 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# MyWorkoutTracker
 
-This contains everything you need to run your app locally.
+## Local development
 
-View your app in AI Studio: https://ai.studio/apps/drive/1KJdw_wu9a1o6yEMuxD40ssC9CpuVtRfw
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Create `.env.local` with:
+   - `VITE_GOOGLE_CLIENT_ID` (Google OAuth client ID)
+   - `GEMINI_API_KEY` (Gemini API key; server-side only)
 3. Run the app:
    `npm run dev`
+
+Note: the AI insight calls a Vercel Serverless Function at `/api/analyze`. For local end-to-end testing of that function, run the project with Vercel's dev server (recommended):
+- Install Vercel CLI: `npm i -g vercel`
+- Run: `vercel dev`
+
+## Vercel deployment (recommended)
+
+Set these Environment Variables in Vercel (Project → Settings → Environment Variables):
+- `VITE_GOOGLE_CLIENT_ID`: Google OAuth Client ID
+- `GEMINI_API_KEY`: Gemini API key (kept secret on the server)
+
+Optional allow-listing:
+- `ALLOWED_GOOGLE_DOMAIN`: only allow users from a given Google Workspace domain (checks the `hd` claim)
+- `ALLOWED_GOOGLE_EMAILS`: comma-separated list of allowed emails
+
+Security model:
+- The browser never receives the Gemini API key.
+- The browser sends a Google ID token (OAuth) to `/api/analyze`.
+- `/api/analyze` verifies the token and then calls Gemini with `GEMINI_API_KEY`.

@@ -1,32 +1,37 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
 import { WorkoutSession } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+type AnalyzeResponse = {
+  text: string;
+};
 
-export const analyzeWorkoutProgress = async (history: WorkoutSession[]) => {
+export const analyzeWorkoutProgress = async (
+  history: WorkoutSession[],
+  idToken: string | null
+) => {
   if (history.length === 0) return "Start a workout to get AI-powered insights!";
-
-  const recentHistory = history.slice(0, 5);
-  const prompt = `
-    Analyze my recent workout history and provide a short, encouraging summary of my progress.
-    History: ${JSON.stringify(recentHistory)}
-    
-    Focus on:
-    - Consistency
-    - Strength improvements (if weights increased)
-    - Areas to focus on next.
-    Keep it concise and professional.
-  `;
+  if (!idToken) return "Sign in to view AI-powered insights.";
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ history }),
     });
-    return response.text;
+
+    if (!response.ok) {
+      const msg = await response.text().catch(() => '');
+      console.error('AI API error:', response.status, msg);
+      return "I'm having trouble analyzing your progress right now, but keep up the great work!";
+    }
+
+    const data = (await response.json()) as AnalyzeResponse;
+    return data.text;
   } catch (error) {
-    console.error("Gemini Error:", error);
+    console.error('AI API error:', error);
     return "I'm having trouble analyzing your progress right now, but keep up the great work!";
   }
 };
