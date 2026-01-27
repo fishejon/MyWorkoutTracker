@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Layout, Plus, Activity, History as HistoryIcon, BarChart3, Settings, Dumbbell } from 'lucide-react';
+import { Activity, History as HistoryIcon, BarChart3, Dumbbell, Plus } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import { AppView, Circuit, WorkoutSession } from './types';
 import { getCircuits, getHistory, saveCircuits, saveSession } from './services/storage';
 import Dashboard from './components/Dashboard';
@@ -9,11 +10,22 @@ import ActiveWorkout from './components/ActiveWorkout';
 import HistoryView from './components/HistoryView';
 import StatsView from './components/StatsView';
 
+const ID_TOKEN_STORAGE_KEY = 'mwt_google_id_token';
+
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>('dashboard');
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [activeCircuits, setActiveCircuits] = useState<Circuit[]>([]);
+  const [idToken, setIdToken] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
+
+  const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
   useEffect(() => {
     setCircuits(getCircuits());
@@ -45,6 +57,15 @@ const App: React.FC = () => {
     setView('history');
   };
 
+  const handleLogout = () => {
+    setIdToken(null);
+    try {
+      sessionStorage.removeItem(ID_TOKEN_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  };
+
   const renderView = () => {
     switch (view) {
       case 'dashboard':
@@ -55,6 +76,7 @@ const App: React.FC = () => {
             onDelete={handleDeleteCircuit}
             onNew={() => setView('builder')}
             history={history}
+            idToken={idToken}
           />
         );
       case 'builder':
@@ -75,7 +97,16 @@ const App: React.FC = () => {
       case 'stats':
         return <StatsView history={history} />;
       default:
-        return <Dashboard circuits={circuits} onStart={handleStartWorkout} onDelete={handleDeleteCircuit} onNew={() => setView('builder')} history={history} />;
+        return (
+          <Dashboard
+            circuits={circuits}
+            onStart={handleStartWorkout}
+            onDelete={handleDeleteCircuit}
+            onNew={() => setView('builder')}
+            history={history}
+            idToken={idToken}
+          />
+        );
     }
   };
 
@@ -92,16 +123,52 @@ const App: React.FC = () => {
     <div className="h-screen-dynamic flex flex-col max-w-md mx-auto bg-slate-50 relative border-x border-slate-200 overflow-hidden">
       {/* Header */}
       <header className="bg-indigo-600 text-white px-4 py-3 sticky top-0 z-10 shadow-lg flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-white/20 rounded-lg">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1.5 bg-white/20 rounded-lg flex-shrink-0">
               <Dumbbell className="w-6 h-6" />
             </div>
-            <h1 className="text-xl font-black tracking-tight italic">MyWorkoutTracker</h1>
+            <h1 className="text-xl font-black tracking-tight italic truncate">MyWorkoutTracker</h1>
           </div>
-          <button onClick={() => setView('stats')} className="p-2 hover:bg-white/10 rounded-full transition-colors active:scale-90">
-            <BarChart3 className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            {idToken ? (
+              <button
+                onClick={handleLogout}
+                className="px-3 py-1.5 bg-white/15 hover:bg-white/20 rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
+                title="Sign out"
+              >
+                Sign out
+              </button>
+            ) : hasGoogleClientId ? (
+              <div className="scale-90 origin-right">
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => {
+                    const token = credentialResponse.credential;
+                    if (!token) return;
+                    setIdToken(token);
+                    try {
+                      sessionStorage.setItem(ID_TOKEN_STORAGE_KEY, token);
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  onError={() => {
+                    console.error('Google login failed');
+                  }}
+                  useOneTap
+                />
+              </div>
+            ) : (
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/80">
+                Set VITE_GOOGLE_CLIENT_ID
+              </span>
+            )}
+
+            <button onClick={() => setView('stats')} className="p-2 hover:bg-white/10 rounded-full transition-colors active:scale-90" title="Stats">
+              <BarChart3 className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </header>
 
