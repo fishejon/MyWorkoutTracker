@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../server/googleAuth';
+import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../server/googleAuth.js';
 
 type VercelRequest = {
   method?: string;

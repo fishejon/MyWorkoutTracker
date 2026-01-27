@@ -1,5 +1,5 @@
-import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../server/googleAuth';
-import { ensureAuthSchema, getSql } from '../../server/db';
+import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../server/googleAuth.js';
+import { ensureAuthSchema, getSql } from '../../server/db.js';
 
 type VercelRequest = {
   method?: string;
