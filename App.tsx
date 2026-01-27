@@ -40,14 +40,16 @@ const App: React.FC = () => {
     }
   });
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
+  const [authError, setAuthError] = useState<string | null>(null);
   const [user, setUser] = useState<AuthedUser | null>(null);
 
   const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
-  const clearSession = () => {
+  const clearSession = (opts?: { error?: string | null }) => {
     setIdToken(null);
     setUser(null);
     setAuthStatus('unauth');
+    setAuthError(opts?.error ?? null);
     setStorageNamespace(null);
     setCircuits([]);
     setHistory([]);
@@ -79,11 +81,13 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!hasGoogleClientId) {
       setAuthStatus('unauth');
+      setAuthError(null);
       return;
     }
 
     if (!idToken) {
       setAuthStatus('unauth');
+      setAuthError(null);
       setUser(null);
       setStorageNamespace(null);
       return;
@@ -102,7 +106,11 @@ const App: React.FC = () => {
         });
 
         if (!resp.ok) {
-          if (!cancelled) clearSession();
+          if (!cancelled) {
+            const body = await resp.text().catch(() => '');
+            const message = body || resp.statusText || 'Unknown error';
+            clearSession({ error: `Sign-in verification failed (${resp.status}): ${message}` });
+          }
           return;
         }
 
@@ -113,7 +121,12 @@ const App: React.FC = () => {
         setStorageNamespace(data.sub);
         setAuthStatus('authed');
       } catch {
-        if (!cancelled) clearSession();
+        if (!cancelled) {
+          clearSession({
+            error:
+              'Sign-in verification failed: could not reach /api/auth/verify. If you are running locally, use `vercel dev`.',
+          });
+        }
       }
     })();
 
@@ -127,6 +140,8 @@ const App: React.FC = () => {
     if (authStatus !== 'authed') return;
     setCircuits(getCircuits());
     setHistory(getHistory());
+    // Always land on the home screen after a successful sign-in.
+    setView('dashboard');
   }, [authStatus]);
 
   const handleCreateCircuit = (newCircuit: Circuit) => {
@@ -235,12 +250,23 @@ const App: React.FC = () => {
             {authStatus === 'checking' ? 'Checking your session…' : 'Sign in to continue.'}
           </p>
 
+          {authError && (
+            <div className="text-left text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 mb-4 whitespace-pre-wrap">
+              {authError}
+            </div>
+          )}
+
           <div className="flex justify-center">
             <GoogleLogin
               onSuccess={(credentialResponse) => {
                 const token = credentialResponse.credential;
-                if (!token) return;
+                if (!token) {
+                  setAuthError('Google did not return a credential. Check your OAuth client settings.');
+                  return;
+                }
 
+                setAuthError(null);
+                setView('dashboard');
                 setIdToken(token);
                 setAuthStatus('checking');
 
@@ -253,6 +279,7 @@ const App: React.FC = () => {
                 void postAuthEvent('login', token);
               }}
               onError={() => {
+                setAuthError('Google login failed.');
                 console.error('Google login failed');
               }}
               useOneTap
