@@ -1,13 +1,25 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { OAuth2Client } from 'google-auth-library';
 import { GoogleGenAI } from '@google/genai';
+
+type VercelRequest = {
+  method?: string;
+  headers: Record<string, string | string[] | undefined>;
+  body?: unknown;
+};
+
+type VercelResponse = {
+  status: (code: number) => VercelResponse;
+  send: (body: string) => void;
+  json: (body: unknown) => void;
+};
 
 type AnalyzeRequestBody = {
   history?: unknown;
 };
 
 function getBearerToken(req: VercelRequest): string | null {
-  const header = req.headers.authorization;
+  const raw = req.headers.authorization ?? req.headers.Authorization;
+  const header = Array.isArray(raw) ? raw[0] : raw;
   if (!header) return null;
   const m = header.match(/^Bearer\s+(.+)$/i);
   return m?.[1] ?? null;
