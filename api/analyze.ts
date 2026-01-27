@@ -1,5 +1,5 @@
-import { OAuth2Client } from 'google-auth-library';
 import { GoogleGenAI } from '@google/genai';
+import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../server/googleAuth';
 
 type VercelRequest = {
   method?: string;
@@ -16,18 +16,6 @@ type VercelResponse = {
 type AnalyzeRequestBody = {
   history?: unknown;
 };
-
-function getBearerToken(req: VercelRequest): string | null {
-  const raw = req.headers.authorization ?? req.headers.Authorization;
-  const header = Array.isArray(raw) ? raw[0] : raw;
-  if (!header) return null;
-  const m = header.match(/^Bearer\s+(.+)$/i);
-  return m?.[1] ?? null;
-}
-
-function getClientId(): string | undefined {
-  return process.env.GOOGLE_CLIENT_ID || process.env.VITE_GOOGLE_CLIENT_ID;
-}
 
 function getGeminiApiKey(): string | undefined {
   return process.env.GEMINI_API_KEY;
@@ -52,13 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const clientId = getClientId();
   const apiKey = getGeminiApiKey();
-
-  if (!clientId) {
-    res.status(500).send('Missing GOOGLE_CLIENT_ID (or VITE_GOOGLE_CLIENT_ID)');
-    return;
-  }
 
   if (!apiKey) {
     res.status(500).send('Missing GEMINI_API_KEY');
@@ -71,35 +53,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const oauth = new OAuth2Client(clientId);
   try {
-    const ticket = await oauth.verifyIdToken({
-      idToken,
-      audience: clientId,
-    });
-
-    const payload = ticket.getPayload();
-    if (!payload?.email || payload.email_verified !== true) {
+    const user = await verifyGoogleIdToken(idToken);
+    if (!user.emailVerified) {
       res.status(403).send('Unverified Google account');
       return;
     }
 
-    // Optional allow-listing (set these in Vercel env vars)
-    const allowedDomain = process.env.ALLOWED_GOOGLE_DOMAIN;
-    const allowedEmails = (process.env.ALLOWED_GOOGLE_EMAILS || '')
-      .split(',')
-      .map((e) => e.trim())
-      .filter(Boolean);
-
-    if (allowedDomain && payload.hd !== allowedDomain) {
-      res.status(403).send('Account not in allowed domain');
-      return;
-    }
-
-    if (allowedEmails.length > 0 && !allowedEmails.includes(payload.email)) {
-      res.status(403).send('Account not allowed');
-      return;
-    }
+    checkAllowList(user);
 
     const { history } = parseJsonBody(req.body);
     if (!Array.isArray(history)) {
