@@ -59,7 +59,7 @@ const StatsView: React.FC<StatsViewProps> = ({ history }) => {
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6">
           <div className="flex items-center gap-2 mb-4">
             <Award className="w-5 h-5 text-indigo-500" />
-            <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider">Total Volume (Weight x Reps)</h3>
+            <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider">Total Volume (lb × reps)</h3>
           </div>
           <div className="h-48 w-full">
             <ResponsiveContainer width="100%" height="100%">
