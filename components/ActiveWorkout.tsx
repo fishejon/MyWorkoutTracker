@@ -273,7 +273,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                     <thead>
                       <tr>
                         <th className="px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">Set</th>
-                        {log.type === 'weight' && <th className="px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">KG</th>}
+                        {log.type === 'weight' && <th className="px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">LBS</th>}
                         <th className="px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
                           {log.type === 'duration' ? 'SECS' : 'REPS'}
                         </th>

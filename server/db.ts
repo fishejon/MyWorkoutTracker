@@ -3,7 +3,8 @@ import postgres from 'postgres';
 type Sql = ReturnType<typeof postgres>;
 
 let sql: Sql | null = null;
-let schemaEnsured = false;
+let authSchemaEnsured = false;
+let appSchemaEnsured = false;
 
 function getDatabaseUrl(): string | null {
   return (
@@ -34,7 +35,7 @@ export function getSql(): Sql | null {
 export async function ensureAuthSchema(): Promise<void> {
   const client = getSql();
   if (!client) return;
-  if (schemaEnsured) return;
+  if (authSchemaEnsured) return;
 
   await client`
     create table if not exists users (
@@ -61,5 +62,25 @@ export async function ensureAuthSchema(): Promise<void> {
 
   await client`create index if not exists auth_events_sub_created_at_idx on auth_events (sub, created_at desc);`;
 
-  schemaEnsured = true;
+  authSchemaEnsured = true;
+}
+
+export async function ensureAppSchema(): Promise<void> {
+  const client = getSql();
+  if (!client) return;
+  if (appSchemaEnsured) return;
+
+  // Ensure auth tables exist first (users is referenced).
+  await ensureAuthSchema();
+
+  await client`
+    create table if not exists user_data (
+      sub text primary key references users(sub) on delete cascade,
+      circuits jsonb not null default '[]'::jsonb,
+      history jsonb not null default '[]'::jsonb,
+      updated_at timestamptz not null default now()
+    );
+  `;
+
+  appSchemaEnsured = true;
 }

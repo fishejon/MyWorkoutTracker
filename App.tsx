@@ -136,18 +136,92 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idToken, hasGoogleClientId]);
 
+  const persistUserData = async (nextCircuits: Circuit[], nextHistory: WorkoutSession[]) => {
+    if (authStatus !== 'authed' || !idToken) return;
+
+    try {
+      await fetch('/api/data/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ circuits: nextCircuits, history: nextHistory }),
+      });
+    } catch (e) {
+      console.warn('Failed to persist user data:', e);
+    }
+  };
+
   useEffect(() => {
-    if (authStatus !== 'authed') return;
-    setCircuits(getCircuits());
-    setHistory(getHistory());
-    // Always land on the home screen after a successful sign-in.
-    setView('dashboard');
-  }, [authStatus]);
+    if (authStatus !== 'authed' || !idToken) return;
+
+    let cancelled = false;
+
+    (async () => {
+      const localCircuits = getCircuits();
+      const localHistory = getHistory();
+
+      try {
+        const resp = await fetch('/api/data/get', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
+
+        if (!resp.ok) {
+          // Fall back to local-only.
+          if (!cancelled) {
+            setCircuits(localCircuits);
+            setHistory(localHistory);
+            setView('dashboard');
+          }
+          return;
+        }
+
+        const data = (await resp.json()) as { circuits: Circuit[]; history: WorkoutSession[] };
+
+        const serverCircuits = Array.isArray(data.circuits) ? data.circuits : [];
+        const serverHistory = Array.isArray(data.history) ? data.history : [];
+
+        // If server has nothing yet but this device has local data, push local to server.
+        const shouldUploadLocal =
+          serverCircuits.length === 0 && serverHistory.length === 0 && (localCircuits.length > 0 || localHistory.length > 0);
+
+        const nextCircuits = shouldUploadLocal ? localCircuits : serverCircuits;
+        const nextHistory = shouldUploadLocal ? localHistory : serverHistory;
+
+        if (!cancelled) {
+          setCircuits(nextCircuits);
+          setHistory(nextHistory);
+          setView('dashboard');
+        }
+
+        if (shouldUploadLocal) {
+          await persistUserData(localCircuits, localHistory);
+        }
+      } catch (e) {
+        console.warn('Failed to sync user data, falling back to local:', e);
+        if (!cancelled) {
+          setCircuits(localCircuits);
+          setHistory(localHistory);
+          setView('dashboard');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus, idToken]);
 
   const handleCreateCircuit = (newCircuit: Circuit) => {
     const updated = [...circuits, newCircuit];
     setCircuits(updated);
     saveCircuits(updated);
+    void persistUserData(updated, history);
     setView('dashboard');
   };
 
@@ -155,6 +229,7 @@ const App: React.FC = () => {
     const updated = circuits.filter(c => c.id !== id);
     setCircuits(updated);
     saveCircuits(updated);
+    void persistUserData(updated, history);
   };
 
   const handleStartWorkout = (selectedCircuits: Circuit[]) => {
@@ -164,7 +239,11 @@ const App: React.FC = () => {
 
   const handleFinishWorkout = (session: WorkoutSession) => {
     saveSession(session);
-    setHistory(prev => [session, ...prev]);
+    setHistory(prev => {
+      const next = [session, ...prev];
+      void persistUserData(circuits, next);
+      return next;
+    });
     setActiveCircuits([]);
     setView('history');
   };
@@ -300,14 +379,14 @@ const App: React.FC = () => {
   // Special full-height handling for active workout and builder
   if (view === 'active' || view === 'builder') {
     return (
-      <div className="h-screen-dynamic w-full max-w-md mx-auto bg-slate-50 relative border-x border-slate-200 overflow-hidden">
+      <div className="h-screen-dynamic w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-slate-50 relative border-x border-slate-200 overflow-hidden">
         {renderView()}
       </div>
     );
   }
 
   return (
-    <div className="h-screen-dynamic flex flex-col max-w-md mx-auto bg-slate-50 relative border-x border-slate-200 overflow-hidden">
+    <div className="h-screen-dynamic flex flex-col w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-slate-50 relative border-x border-slate-200 overflow-hidden">
       {/* Header */}
       <header className="bg-indigo-600 text-white px-4 py-3 sticky top-0 z-10 shadow-lg flex-shrink-0">
         <div className="flex items-center justify-between gap-3">
@@ -347,7 +426,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Bottom Navigation (Glassmorphic) */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto glass-nav border-t border-slate-200/50 px-8 pt-3 pb-[calc(1.5rem+var(--sab))] flex justify-between items-center z-50">
+      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-slate-200/50 px-8 pt-3 pb-[calc(1.5rem+var(--sab))] flex justify-between items-center z-50">
         <button 
           onClick={() => setView('dashboard')}
           className={`flex flex-col items-center gap-1 transition-all ${view === 'dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}

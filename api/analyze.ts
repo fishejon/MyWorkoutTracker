@@ -73,6 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 Analyze my recent workout history and provide a short, encouraging summary of my progress.
 History: ${JSON.stringify(recentHistory)}
 
+Weights are in pounds (lbs).
+
 Focus on:
 - Consistency
 - Strength improvements (if weights increased)

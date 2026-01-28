@@ -21,7 +21,7 @@ export interface Circuit {
 export interface SetLog {
   setIndex: number;
   value: number; // reps or duration (seconds)
-  weight?: number; // optional weight in kg/lbs
+  weight?: number; // optional weight in lbs
 }
 
 export interface ExerciseLog {
