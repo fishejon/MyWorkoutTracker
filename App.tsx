@@ -32,6 +32,7 @@ const App: React.FC = () => {
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [activeCircuits, setActiveCircuits] = useState<Circuit[]>([]);
+  const [editingCircuit, setEditingCircuit] = useState<Circuit | null>(null);
   const [idToken, setIdToken] = useState<string | null>(() => {
     try {
       return sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
@@ -222,6 +223,16 @@ const App: React.FC = () => {
     setCircuits(updated);
     saveCircuits(updated);
     void persistUserData(updated, history);
+    setEditingCircuit(null);
+    setView('dashboard');
+  };
+
+  const handleUpdateCircuit = (updatedCircuit: Circuit) => {
+    const updated = circuits.map(c => (c.id === updatedCircuit.id ? updatedCircuit : c));
+    setCircuits(updated);
+    saveCircuits(updated);
+    void persistUserData(updated, history);
+    setEditingCircuit(null);
     setView('dashboard');
   };
 
@@ -230,6 +241,11 @@ const App: React.FC = () => {
     setCircuits(updated);
     saveCircuits(updated);
     void persistUserData(updated, history);
+
+    if (editingCircuit?.id === id) {
+      setEditingCircuit(null);
+      setView('dashboard');
+    }
   };
 
   const handleStartWorkout = (selectedCircuits: Circuit[]) => {
@@ -262,15 +278,31 @@ const App: React.FC = () => {
         return (
           <Dashboard 
             circuits={circuits} 
+            history={history}
             onStart={handleStartWorkout} 
             onDelete={handleDeleteCircuit}
-            onNew={() => setView('builder')}
-            history={history}
-            idToken={idToken}
+            onEdit={(circuit) => {
+              setEditingCircuit(circuit);
+              setView('builder');
+            }}
+            onNew={() => {
+              setEditingCircuit(null);
+              setView('builder');
+            }}
           />
         );
       case 'builder':
-        return <CircuitBuilder onSave={handleCreateCircuit} onCancel={() => setView('dashboard')} />;
+        return (
+          <CircuitBuilder
+            initialCircuit={editingCircuit}
+            onSave={handleCreateCircuit}
+            onUpdate={handleUpdateCircuit}
+            onCancel={() => {
+              setEditingCircuit(null);
+              setView('dashboard');
+            }}
+          />
+        );
       case 'active':
         return activeCircuits.length > 0 ? (
           <ActiveWorkout 
@@ -290,11 +322,17 @@ const App: React.FC = () => {
         return (
           <Dashboard
             circuits={circuits}
+            history={history}
             onStart={handleStartWorkout}
             onDelete={handleDeleteCircuit}
-            onNew={() => setView('builder')}
-            history={history}
-            idToken={idToken}
+            onEdit={(circuit) => {
+              setEditingCircuit(circuit);
+              setView('builder');
+            }}
+            onNew={() => {
+              setEditingCircuit(null);
+              setView('builder');
+            }}
           />
         );
     }
@@ -436,7 +474,10 @@ const App: React.FC = () => {
         </button>
         
         <button 
-          onClick={() => setView('builder')}
+          onClick={() => {
+            setEditingCircuit(null);
+            setView('builder');
+          }}
           className="relative -top-6"
         >
           <div className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-200 ring-8 ring-slate-50 active:scale-90 transition-all">

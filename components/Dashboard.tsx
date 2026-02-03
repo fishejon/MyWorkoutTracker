@@ -1,37 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Circuit, WorkoutSession } from '../types';
-import { Play, Trash2, PlusCircle, Sparkles, Check, Square } from 'lucide-react';
-import { analyzeWorkoutProgress } from '../services/geminiService';
+import { Play, Trash2, PlusCircle, Pencil, Check } from 'lucide-react';
 
 interface DashboardProps {
   circuits: Circuit[];
   history: WorkoutSession[];
-  idToken: string | null;
   onStart: (selectedCircuits: Circuit[]) => void;
   onDelete: (id: string) => void;
+  onEdit: (circuit: Circuit) => void;
   onNew: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ circuits, history, idToken, onStart, onDelete, onNew }) => {
-  const [aiInsight, setAiInsight] = useState<string | null>(null);
-  const [isLoadingInsight, setIsLoadingInsight] = useState(false);
+const Dashboard: React.FC<DashboardProps> = ({ circuits, history, onStart, onDelete, onEdit, onNew }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  useEffect(() => {
-    const fetchInsight = async () => {
-      if (history.length > 0 && idToken) {
-        setIsLoadingInsight(true);
-        const insight = await analyzeWorkoutProgress(history, idToken);
-        setAiInsight(insight);
-        setIsLoadingInsight(false);
-      } else {
-        // Keep messaging simple; actual sign-in UI lives in the header.
-        setAiInsight(null);
-      }
-    };
-    fetchInsight();
-  }, [history.length, idToken]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
@@ -47,19 +29,6 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, idToken, onSta
 
   return (
     <div className="p-5 space-y-6">
-      {/* AI Insight Card */}
-      <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg">
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="w-5 h-5 text-yellow-300" />
-          <h2 className="font-semibold">AI Progress Insight</h2>
-        </div>
-        <p className="text-indigo-50 text-sm leading-relaxed min-h-[40px]">
-          {isLoadingInsight
-            ? "Analyzing your performance..."
-            : aiInsight || (idToken ? "Build circuits and log workouts for personalized AI coaching." : "Sign in to enable AI insights.")}
-        </p>
-      </div>
-
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-slate-800">My Circuits</h3>
         <button onClick={onNew} className="text-indigo-600 text-sm font-semibold flex items-center gap-1">
@@ -97,9 +66,22 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, idToken, onSta
                   </div>
                 </div>
                 <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(circuit);
+                    }}
+                    className="p-2 text-slate-300 hover:text-indigo-600 transition-colors"
+                    aria-label={`Edit ${circuit.name}`}
+                    title="Edit"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); onDelete(circuit.id); }}
                     className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                    aria-label={`Delete ${circuit.name}`}
+                    title="Delete"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

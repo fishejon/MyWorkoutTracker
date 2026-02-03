@@ -1,19 +1,34 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Circuit, CircuitExercise, ExerciseType, Exercise } from '../types';
 import { EXERCISE_GROUPS } from '../constants';
 import { Search, Plus, X, ChevronRight, Layers, ArrowLeft, Keyboard } from 'lucide-react';
 
 interface CircuitBuilderProps {
+  initialCircuit?: Circuit | null;
   onSave: (circuit: Circuit) => void;
+  onUpdate: (circuit: Circuit) => void;
   onCancel: () => void;
 }
 
-const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ onSave, onCancel }) => {
-  const [name, setName] = useState('');
-  const [selectedExercises, setSelectedExercises] = useState<CircuitExercise[]>([]);
+const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave, onUpdate, onCancel }) => {
+  const [name, setName] = useState(initialCircuit?.name ?? '');
+  const [selectedExercises, setSelectedExercises] = useState<CircuitExercise[]>(initialCircuit?.exercises ?? []);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+
+  const isEditing = Boolean(initialCircuit);
+
+  // Sync state when opening builder for a different circuit
+  useEffect(() => {
+    setName(initialCircuit?.name ?? '');
+    setSelectedExercises(initialCircuit?.exercises ?? []);
+    setSelectedGroup(null);
+    setSearchQuery('');
+    setIsCustomMode(false);
+    setCustomName('');
+    setCustomType('weight');
+  }, [initialCircuit]);
   
   // Custom Exercise Mode
   const [isCustomMode, setIsCustomMode] = useState(false);
@@ -44,11 +59,18 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ onSave, onCancel }) => 
       alert("Please enter a name and select at least one exercise.");
       return;
     }
-    onSave({
-      id: Date.now().toString(),
+
+    const next: Circuit = {
+      id: initialCircuit?.id ?? Date.now().toString(),
       name: name.trim(),
-      exercises: selectedExercises
-    });
+      exercises: selectedExercises,
+    };
+
+    if (isEditing) {
+      onUpdate(next);
+    } else {
+      onSave(next);
+    }
   };
 
   const addCustomExercise = () => {
@@ -74,7 +96,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ onSave, onCancel }) => 
     <div className="flex flex-col h-full bg-slate-50">
       {/* Header */}
       <div className="bg-white p-4 border-b border-slate-200 sticky top-0 z-40 flex items-center justify-between">
-        <h2 className="text-xl font-bold text-slate-800">New Circuit</h2>
+        <h2 className="text-xl font-bold text-slate-800">{isEditing ? 'Edit Circuit' : 'New Circuit'}</h2>
         <button onClick={onCancel} className="text-slate-400 p-2 hover:bg-slate-100 rounded-full transition-colors"><X /></button>
       </div>
 
@@ -239,7 +261,9 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ onSave, onCancel }) => 
       {/* Footer */}
       <div className="p-4 bg-white border-t border-slate-200 sticky bottom-0 z-40 flex gap-3 shadow-2xl">
         <button onClick={onCancel} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">Cancel</button>
-        <button onClick={handleSave} disabled={!name.trim() || selectedExercises.length === 0} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg disabled:opacity-50 transition-all active:scale-[0.98]">CREATE CIRCUIT</button>
+        <button onClick={handleSave} disabled={!name.trim() || selectedExercises.length === 0} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg disabled:opacity-50 transition-all active:scale-[0.98]">
+          {isEditing ? 'SAVE CHANGES' : 'CREATE CIRCUIT'}
+        </button>
       </div>
     </div>
   );
