@@ -48,6 +48,10 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, onStart, onDel
         <div className="grid gap-4">
           {circuits.map((circuit) => {
             const isSelected = selectedIds.includes(circuit.id);
+            const exerciseNames = circuit.exercises.map(ex => ex.name);
+            const exerciseListFull = exerciseNames.join(' • ');
+            const exerciseListPreview = `${exerciseNames.slice(0, 4).join(' • ')}${exerciseNames.length > 4 ? ` • +${exerciseNames.length - 4} more` : ''}`;
+
             return (
               <div 
                 key={circuit.id} 
@@ -62,6 +66,12 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, onStart, onDel
                     <h4 className="font-bold text-slate-800 truncate">{circuit.name}</h4>
                     <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">
                       {circuit.exercises.length} Exercises
+                    </p>
+                    <p
+                      className="text-slate-500 text-[11px] font-medium mt-1 truncate"
+                      title={exerciseListFull}
+                    >
+                      {exerciseListPreview}
                     </p>
                   </div>
                 </div>
