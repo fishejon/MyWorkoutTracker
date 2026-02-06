@@ -1,5 +1,7 @@
 import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../server/googleAuth.js';
 import { ensureAppSchema, getSql } from '../../server/db.js';
+import { normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
+import { WorkoutSession } from '../../types.js';
 
 type VercelRequest = {
   method?: string;
@@ -66,6 +68,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    // Validate and deduplicate workout sessions by ID
+    const uniqueWorkouts = new Map<string, WorkoutSession>();
+    for (const workoutSession of history as WorkoutSession[]) {
+      if (!workoutSession || typeof workoutSession !== 'object' || !workoutSession.id) {
+        continue; // Skip invalid entries
+      }
+      if (uniqueWorkouts.has(workoutSession.id)) {
+        // Keep the first occurrence, skip duplicates
+        continue;
+      }
+      uniqueWorkouts.set(workoutSession.id, workoutSession);
+    }
+    const deduplicatedHistory = Array.from(uniqueWorkouts.values());
+
     // Ensure the user exists in users table (verify route usually handles this).
     await sql`
       insert into users (sub, email, last_seen_at)
@@ -74,15 +90,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       do update set email = excluded.email, last_seen_at = now();
     `;
 
+    // Save circuits to JSONB (unchanged)
     await sql`
-      insert into user_data (sub, circuits, history, updated_at)
-      values (${user.sub}, ${sql.json(circuits)}, ${sql.json(history)}, now())
+      insert into user_data (sub, circuits, updated_at)
+      values (${user.sub}, ${sql.json(circuits)}, now())
       on conflict (sub)
       do update set
         circuits = excluded.circuits,
-        history = excluded.history,
         updated_at = now();
     `;
+
+    // Save workouts in normalized format using transaction
+    await sql.begin(async (tx) => {
+      // Delete existing workouts for this user (to handle updates)
+      // Cascade delete will automatically remove rounds and exercise_sets
+      await tx`
+        delete from workouts
+        where user_id = ${user.sub}
+      `;
+
+      // Insert each workout session as normalized rows
+      for (const workoutSession of deduplicatedHistory) {
+        const normalized = normalizeWorkoutSession(workoutSession, user.sub);
+
+        // Insert workout
+        await tx`
+          insert into workouts (workout_id, user_id, date, created_at)
+          values (${normalized.workout.workout_id}, ${normalized.workout.user_id}, ${normalized.workout.date}, ${normalized.workout.created_at})
+        `;
+
+        // Insert rounds and sets for this workout
+        for (const { round, sets } of normalized.rounds) {
+          await tx`
+            insert into rounds (round_id, workout_id, circuit_id, round_number, created_at)
+            values (${round.round_id}, ${round.workout_id}, ${round.circuit_id}, ${round.round_number}, ${round.created_at})
+          `;
+
+          // Insert sets for this round
+          for (const set of sets) {
+            await tx`
+              insert into exercise_sets (
+                set_id, round_id, exercise_id, exercise_name, exercise_type,
+                set_index, value, weight, created_at
+              )
+              values (
+                ${set.set_id}, ${set.round_id}, ${set.exercise_id}, ${set.exercise_name},
+                ${set.exercise_type}, ${set.set_index}, ${set.value}, ${set.weight}, ${set.created_at}
+              )
+            `;
+          }
+        }
+      }
+    });
 
     res.status(200).json({ ok: true });
   } catch (err) {

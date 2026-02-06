@@ -1,5 +1,8 @@
 import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../server/googleAuth.js';
 import { ensureAppSchema, getSql } from '../../server/db.js';
+import { denormalizeWorkouts, normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
+import { WorkoutRow, RoundRow, ExerciseSetRow } from '../../server/workoutDataTransform.js';
+import { WorkoutSession } from '../../types.js';
 
 type VercelRequest = {
   method?: string;
@@ -41,7 +44,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await ensureAppSchema();
 
-    const rows = await sql<{
+    // Get circuits and check for old history data
+    const userDataRows = await sql<{
       circuits: unknown;
       history: unknown;
     }[]>`
@@ -50,15 +54,178 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       where sub = ${user.sub}
     `;
 
-    if (rows.length === 0) {
-      res.status(200).json({ circuits: [], history: [] });
+    const circuits = userDataRows.length > 0 && Array.isArray(userDataRows[0].circuits)
+      ? userDataRows[0].circuits
+      : [];
+
+    // Check if user has old JSONB history data that needs migration
+    // Validate old history data structure before casting
+    const oldHistoryRaw = userDataRows.length > 0 && Array.isArray(userDataRows[0].history)
+      ? userDataRows[0].history
+      : [];
+    
+    // Runtime validation: ensure each item is a valid WorkoutSession
+    const oldHistory = (oldHistoryRaw as unknown[]).filter((item): item is WorkoutSession => {
+      return (
+        typeof item === 'object' &&
+        item !== null &&
+        'id' in item &&
+        typeof (item as { id: unknown }).id === 'string' &&
+        'date' in item &&
+        typeof (item as { date: unknown }).date === 'string' &&
+        'logs' in item &&
+        Array.isArray((item as { logs: unknown }).logs) &&
+        'circuitNames' in item &&
+        Array.isArray((item as { circuitNames: unknown }).circuitNames)
+      );
+    });
+
+    // Get workouts from normalized tables
+    const workoutRows = await sql<WorkoutRow[]>`
+      select workout_id, user_id, date, created_at
+      from workouts
+      where user_id = ${user.sub}
+      order by date desc
+    `;
+
+    // Migrate old data if it exists and no normalized data exists
+    if (oldHistory.length > 0 && workoutRows.length === 0) {
+      // Migrate old JSONB history to normalized tables
+      await sql.begin(async (tx) => {
+        for (const workoutSession of oldHistory) {
+          const normalized = normalizeWorkoutSession(workoutSession, user.sub);
+
+          // Insert workout
+          await tx`
+            insert into workouts (workout_id, user_id, date, created_at)
+            values (${normalized.workout.workout_id}, ${normalized.workout.user_id}, ${normalized.workout.date}, ${normalized.workout.created_at})
+          `;
+
+          // Insert rounds and sets
+          for (const { round, sets } of normalized.rounds) {
+            await tx`
+              insert into rounds (round_id, workout_id, circuit_id, round_number, created_at)
+              values (${round.round_id}, ${round.workout_id}, ${round.circuit_id}, ${round.round_number}, ${round.created_at})
+            `;
+
+            for (const set of sets) {
+              await tx`
+                insert into exercise_sets (
+                  set_id, round_id, exercise_id, exercise_name, exercise_type,
+                  set_index, value, weight, created_at
+                )
+                values (
+                  ${set.set_id}, ${set.round_id}, ${set.exercise_id}, ${set.exercise_name},
+                  ${set.exercise_type}, ${set.set_index}, ${set.value}, ${set.weight}, ${set.created_at}
+                )
+              `;
+            }
+          }
+        }
+      });
+
+      // Re-query workouts after migration
+      const migratedWorkoutRows = await sql<WorkoutRow[]>`
+        select workout_id, user_id, date, created_at
+        from workouts
+        where user_id = ${user.sub}
+        order by date desc
+      `;
+
+      if (migratedWorkoutRows.length > 0) {
+        // Use migrated data
+        const roundRows = await sql<RoundRow[]>`
+          select round_id, workout_id, circuit_id, round_number, created_at
+          from rounds
+          where workout_id = any(${sql(migratedWorkoutRows.map(w => w.workout_id))})
+          order by workout_id, round_number
+        `;
+
+        const roundIds = roundRows.map(r => r.round_id);
+        const setRows = roundIds.length > 0
+          ? await sql<ExerciseSetRow[]>`
+              select set_id, round_id, exercise_id, exercise_name, exercise_type,
+                     set_index, value, weight, created_at
+              from exercise_sets
+              where round_id = any(${sql(roundIds)})
+              order by round_id, set_index
+            `
+          : [];
+
+        const workoutsData = migratedWorkoutRows.map(workout => {
+          const rounds = roundRows
+            .filter(r => r.workout_id === workout.workout_id)
+            .map(round => ({
+              round,
+              sets: setRows.filter(s => s.round_id === round.round_id),
+            }));
+
+          return { workout, rounds };
+        });
+
+        const history = denormalizeWorkouts(workoutsData);
+        
+        // Clear old history data after successful migration to avoid repeated checks
+        await sql`
+          update user_data
+          set history = '[]'::jsonb
+          where sub = ${user.sub}
+        `;
+        
+        res.status(200).json({ circuits, history });
+        return;
+      }
+    }
+
+    if (workoutRows.length === 0) {
+      res.status(200).json({ circuits, history: [] });
       return;
     }
 
-    const row = rows[0];
+    // Get rounds for these workouts
+    const workoutIds = workoutRows.map(w => w.workout_id);
+    const roundRows = workoutIds.length > 0
+      ? await sql<RoundRow[]>`
+          select round_id, workout_id, circuit_id, round_number, created_at
+          from rounds
+          where workout_id = any(${sql(workoutIds)})
+          order by workout_id, round_number
+        `
+      : [];
+
+    // Get sets for these rounds
+    const roundIds = roundRows.map(r => r.round_id);
+    const setRows = roundIds.length > 0
+      ? await sql<ExerciseSetRow[]>`
+          select set_id, round_id, exercise_id, exercise_name, exercise_type,
+                 set_index, value, weight, created_at
+          from exercise_sets
+          where round_id = any(${sql(roundIds)})
+          order by round_id, set_index
+        `
+      : [];
+
+    // Group data by workout
+    const workoutsData = workoutRows.map(workout => {
+      const rounds = roundRows
+        .filter(r => r.workout_id === workout.workout_id)
+        .map(round => ({
+          round,
+          sets: setRows.filter(s => s.round_id === round.round_id),
+        }));
+
+      return {
+        workout,
+        rounds,
+      };
+    });
+
+    // Reconstruct WorkoutSession objects
+    const history = denormalizeWorkouts(workoutsData);
+
     res.status(200).json({
-      circuits: Array.isArray(row.circuits) ? row.circuits : [],
-      history: Array.isArray(row.history) ? row.history : [],
+      circuits,
+      history,
     });
   } catch (err) {
     console.error('data/get error', err);
