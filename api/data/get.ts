@@ -44,6 +44,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await ensureAppSchema();
 
+    // Ensure circuit_name column exists (for existing tables)
+    try {
+      await sql`alter table rounds add column if not exists circuit_name text;`;
+    } catch (e) {
+      // Column might already exist or table doesn't exist yet - ignore
+      console.log('Note: circuit_name column check:', e);
+    }
+
     // Get circuits and check for old history data
     const userDataRows = await sql<{
       circuits: unknown;
@@ -64,6 +72,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? userDataRows[0].history
       : [];
     
+    console.log(`[Migration Debug] User ${user.sub}: userDataRows.length=${userDataRows.length}, oldHistoryRaw.length=${oldHistoryRaw.length}`);
+    
     // Runtime validation: ensure each item is a valid WorkoutSession
     const oldHistory = (oldHistoryRaw as unknown[]).filter((item): item is WorkoutSession => {
       return (
@@ -80,6 +90,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     });
 
+    console.log(`[Migration Debug] After validation: oldHistory.length=${oldHistory.length}`);
+
     // Get workouts from normalized tables
     const workoutRows = await sql<WorkoutRow[]>`
       select workout_id, user_id, date, created_at
@@ -87,6 +99,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       where user_id = ${user.sub}
       order by date desc
     `;
+
+    console.log(`[Migration Debug] Existing workouts: ${workoutRows.length}`);
 
     // Migrate old data if it exists and no normalized data exists
     if (oldHistory.length > 0 && workoutRows.length === 0) {
@@ -193,11 +207,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       } else {
         // Migration ran but no data was created - don't clear old data
-        console.error(`Migration completed but no workouts were created for user ${user.sub}`);
+        console.error(`[Migration Debug] Migration completed but no workouts were created for user ${user.sub}`);
+        // Return old history if migration failed
+        if (oldHistory.length > 0) {
+          res.status(200).json({ circuits, history: oldHistory });
+          return;
+        }
       }
     }
 
+    // If no workouts exist and no old history, return empty
     if (workoutRows.length === 0) {
+      console.log(`[Migration Debug] No workouts found, oldHistory.length=${oldHistory.length}`);
+      // If we have old history but migration didn't run, return it
+      if (oldHistory.length > 0) {
+        console.log(`[Migration Debug] Returning old history format as fallback`);
+        res.status(200).json({ circuits, history: oldHistory });
+        return;
+      }
       res.status(200).json({ circuits, history: [] });
       return;
     }
