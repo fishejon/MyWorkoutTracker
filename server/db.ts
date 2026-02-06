@@ -85,9 +85,10 @@ export async function ensureAppSchema(): Promise<void> {
 
   // Normalized workout storage tables
   // Workouts table: one row per workout session
+  // Note: workout_id is UUID, but we generate it in code to ensure consistency
   await client`
     create table if not exists workouts (
-      workout_id uuid primary key default gen_random_uuid(),
+      workout_id uuid primary key,
       user_id text not null references users(sub) on delete cascade,
       date timestamptz not null,
       created_at timestamptz not null default now()

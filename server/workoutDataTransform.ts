@@ -57,8 +57,12 @@ export function normalizeWorkoutSession(
   workoutSession: WorkoutSession,
   userId: string
 ): NormalizedWorkout {
+  // Generate a new UUID for workout_id since old IDs are timestamps, not UUIDs
+  // The database will also generate UUIDs, but we need consistent IDs for rounds/sets
+  const workoutId = randomUUID();
+  
   const workout: WorkoutRow = {
-    workout_id: workoutSession.id,
+    workout_id: workoutId,
     user_id: userId,
     date: new Date(workoutSession.date),
     created_at: new Date(),
@@ -94,7 +98,7 @@ export function normalizeWorkoutSession(
 
     const round: RoundRow = {
       round_id: roundId,
-      workout_id: workoutSession.id,
+      workout_id: workoutId, // Use the generated UUID, not the old timestamp ID
       circuit_id: circuitId,
       circuit_name: circuitName,
       round_number: roundNumber,
@@ -189,7 +193,7 @@ export function denormalizeWorkouts(
     }
 
     return {
-      id: workout.workout_id,
+      id: workout.workout_id, // UUID from database
       date: workout.date.toISOString(),
       circuitNames: Array.from(circuitNames),
       logs: exerciseLogs,
