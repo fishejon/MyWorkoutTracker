@@ -90,39 +90,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Migrate old data if it exists and no normalized data exists
     if (oldHistory.length > 0 && workoutRows.length === 0) {
+      console.log(`Starting migration for user ${user.sub}: ${oldHistory.length} workout(s)`);
+      
       // Migrate old JSONB history to normalized tables
-      await sql.begin(async (tx) => {
-        for (const workoutSession of oldHistory) {
-          const normalized = normalizeWorkoutSession(workoutSession, user.sub);
+      try {
+        await sql.begin(async (tx) => {
+          for (const workoutSession of oldHistory) {
+            const normalized = normalizeWorkoutSession(workoutSession, user.sub);
 
-          // Insert workout
-          await tx`
-            insert into workouts (workout_id, user_id, date, created_at)
-            values (${normalized.workout.workout_id}, ${normalized.workout.user_id}, ${normalized.workout.date}, ${normalized.workout.created_at})
-          `;
-
-          // Insert rounds and sets
-          for (const { round, sets } of normalized.rounds) {
+            // Insert workout
             await tx`
-              insert into rounds (round_id, workout_id, circuit_id, circuit_name, round_number, created_at)
-              values (${round.round_id}, ${round.workout_id}, ${round.circuit_id}, ${round.circuit_name}, ${round.round_number}, ${round.created_at})
+              insert into workouts (workout_id, user_id, date, created_at)
+              values (${normalized.workout.workout_id}, ${normalized.workout.user_id}, ${normalized.workout.date}, ${normalized.workout.created_at})
             `;
 
-            for (const set of sets) {
+            // Insert rounds and sets
+            for (const { round, sets } of normalized.rounds) {
               await tx`
-                insert into exercise_sets (
-                  set_id, round_id, exercise_id, exercise_name, exercise_type,
-                  set_index, value, weight, created_at
-                )
-                values (
-                  ${set.set_id}, ${set.round_id}, ${set.exercise_id}, ${set.exercise_name},
-                  ${set.exercise_type}, ${set.set_index}, ${set.value}, ${set.weight}, ${set.created_at}
-                )
+                insert into rounds (round_id, workout_id, circuit_id, circuit_name, round_number, created_at)
+                values (${round.round_id}, ${round.workout_id}, ${round.circuit_id}, ${round.circuit_name}, ${round.round_number}, ${round.created_at})
               `;
+
+              for (const set of sets) {
+                await tx`
+                  insert into exercise_sets (
+                    set_id, round_id, exercise_id, exercise_name, exercise_type,
+                    set_index, value, weight, created_at
+                  )
+                  values (
+                    ${set.set_id}, ${set.round_id}, ${set.exercise_id}, ${set.exercise_name},
+                    ${set.exercise_type}, ${set.set_index}, ${set.value}, ${set.weight}, ${set.created_at}
+                  )
+                `;
+              }
             }
           }
-        }
-      });
+        });
+        
+        console.log(`Migration completed successfully for user ${user.sub}`);
+      } catch (migrationError) {
+        console.error(`Migration failed for user ${user.sub}:`, migrationError);
+        // Don't clear old data if migration failed
+        // Return old data format so user doesn't lose data
+        res.status(200).json({ 
+          circuits, 
+          history: oldHistory // Return old format if migration fails
+        });
+        return;
+      }
 
       // Re-query workouts after migration
       const migratedWorkoutRows = await sql<WorkoutRow[]>`
@@ -165,15 +180,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const history = denormalizeWorkouts(workoutsData);
         
-        // Clear old history data after successful migration to avoid repeated checks
-        await sql`
-          update user_data
-          set history = '[]'::jsonb
-          where sub = ${user.sub}
-        `;
+        // Only clear old history data if migration was successful and we have data
+        if (history.length > 0) {
+          await sql`
+            update user_data
+            set history = '[]'::jsonb
+            where sub = ${user.sub}
+          `;
+        }
         
         res.status(200).json({ circuits, history });
         return;
+      } else {
+        // Migration ran but no data was created - don't clear old data
+        console.error(`Migration completed but no workouts were created for user ${user.sub}`);
       }
     }
 
