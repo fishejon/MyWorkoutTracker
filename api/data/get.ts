@@ -166,7 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const roundRows = await sql<RoundRow[]>`
           select round_id, workout_id, circuit_id, circuit_name, round_number, created_at
           from rounds
-          where workout_id = any(${sql(migratedWorkoutRows.map(w => w.workout_id))})
+          where workout_id = any(${migratedWorkoutRows.map(w => w.workout_id)})
           order by workout_id, round_number
         `;
 
@@ -176,7 +176,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               select set_id, round_id, exercise_id, exercise_name, exercise_type,
                      set_index, value, weight, created_at
               from exercise_sets
-              where round_id = any(${sql(roundIds)})
+              where round_id = any(${roundIds})
               order by round_id, set_index
             `
           : [];
@@ -235,7 +235,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await sql<RoundRow[]>`
           select round_id, workout_id, circuit_id, circuit_name, round_number, created_at
           from rounds
-          where workout_id = any(${sql(workoutIds)})
+          where workout_id = any(${workoutIds})
           order by workout_id, round_number
         `
       : [];
@@ -247,7 +247,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           select set_id, round_id, exercise_id, exercise_name, exercise_type,
                  set_index, value, weight, created_at
           from exercise_sets
-          where round_id = any(${sql(roundIds)})
+          where round_id = any(${roundIds})
           order by round_id, set_index
         `
       : [];
