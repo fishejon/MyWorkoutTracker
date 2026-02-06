@@ -100,9 +100,15 @@ export async function ensureAppSchema(): Promise<void> {
       round_id uuid primary key default gen_random_uuid(),
       workout_id uuid not null references workouts(workout_id) on delete cascade,
       circuit_id text not null,
+      circuit_name text not null,
       round_number integer not null,
       created_at timestamptz not null default now()
     );
+  `;
+
+  // Add circuit_name column if it doesn't exist (for existing tables)
+  await client`
+    alter table rounds add column if not exists circuit_name text;
   `;
 
   // Exercise sets table: one row per set within a round

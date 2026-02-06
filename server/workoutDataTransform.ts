@@ -15,6 +15,7 @@ export interface RoundRow {
   round_id: string;
   workout_id: string;
   circuit_id: string;
+  circuit_name: string;
   round_number: number;
   created_at: Date;
 }
@@ -87,11 +88,15 @@ export function normalizeWorkoutSession(
     // If we need multiple rounds, we'd group by some criteria (e.g., sequence)
     const roundNumber = 1;
     const roundId = randomUUID();
+    
+    // Get circuit name from first log (all logs in group have same circuit)
+    const circuitName = logs[0]?.circuitName || circuitId;
 
     const round: RoundRow = {
       round_id: roundId,
       workout_id: workoutSession.id,
       circuit_id: circuitId,
+      circuit_name: circuitName,
       round_number: roundNumber,
       created_at: new Date(),
     };
@@ -142,7 +147,7 @@ export function denormalizeWorkouts(
 
     // Process each round
     for (const { round, sets } of rounds) {
-      circuitNames.add(round.circuit_id);
+      circuitNames.add(round.circuit_name);
 
       // Group sets by exercise_id within this round
       const exerciseGroups = new Map<string, ExerciseSetRow[]>();
@@ -177,6 +182,7 @@ export function denormalizeWorkouts(
           exerciseName: firstSet.exercise_name,
           type: exerciseType,
           circuitId: round.circuit_id,
+          circuitName: round.circuit_name,
           sets: sortedSets,
         });
       }

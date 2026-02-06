@@ -122,8 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Insert rounds and sets for this workout
         for (const { round, sets } of normalized.rounds) {
           await tx`
-            insert into rounds (round_id, workout_id, circuit_id, round_number, created_at)
-            values (${round.round_id}, ${round.workout_id}, ${round.circuit_id}, ${round.round_number}, ${round.created_at})
+            insert into rounds (round_id, workout_id, circuit_id, circuit_name, round_number, created_at)
+            values (${round.round_id}, ${round.workout_id}, ${round.circuit_id}, ${round.circuit_name}, ${round.round_number}, ${round.created_at})
           `;
 
           // Insert sets for this round
