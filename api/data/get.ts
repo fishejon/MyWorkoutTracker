@@ -4,6 +4,8 @@ import { denormalizeWorkouts, normalizeWorkoutSession } from '../../server/worko
 import { WorkoutRow, RoundRow, ExerciseSetRow } from '../../server/workoutDataTransform.js';
 import { WorkoutSession } from '../../types.js';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 type VercelRequest = {
   method?: string;
   headers: Record<string, string | string[] | undefined>;
@@ -47,9 +49,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Ensure circuit_name column exists (for existing tables)
     try {
       await sql`alter table rounds add column if not exists circuit_name text;`;
-    } catch (e) {
+    } catch {
       // Column might already exist or table doesn't exist yet - ignore
-      console.log('Note: circuit_name column check:', e);
     }
 
     // Get circuits and check for old history data
@@ -72,8 +73,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? userDataRows[0].history
       : [];
     
-    console.log(`[Migration Debug] User ${user.sub}: userDataRows.length=${userDataRows.length}, oldHistoryRaw.length=${oldHistoryRaw.length}`);
-    
+    if (isDev) console.log(`[Migration Debug] User ${user.sub}: userDataRows.length=${userDataRows.length}, oldHistoryRaw.length=${oldHistoryRaw.length}`);
+
     // Runtime validation: ensure each item is a valid WorkoutSession
     const oldHistory = (oldHistoryRaw as unknown[]).filter((item): item is WorkoutSession => {
       return (
@@ -90,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     });
 
-    console.log(`[Migration Debug] After validation: oldHistory.length=${oldHistory.length}`);
+    if (isDev) console.log(`[Migration Debug] After validation: oldHistory.length=${oldHistory.length}`);
 
     // Get workouts from normalized tables
     const workoutRows = await sql<WorkoutRow[]>`
@@ -100,12 +101,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       order by date desc
     `;
 
-    console.log(`[Migration Debug] Existing workouts: ${workoutRows.length}`);
+    if (isDev) console.log(`[Migration Debug] Existing workouts: ${workoutRows.length}`);
 
     // Migrate old data if it exists and no normalized data exists
     if (oldHistory.length > 0 && workoutRows.length === 0) {
-      console.log(`Starting migration for user ${user.sub}: ${oldHistory.length} workout(s)`);
-      
+      if (isDev) console.log(`Starting migration for user ${user.sub}: ${oldHistory.length} workout(s)`);
+
       // Migrate old JSONB history to normalized tables
       try {
         await sql.begin(async (tx) => {
@@ -140,8 +141,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           }
         });
-        
-        console.log(`Migration completed successfully for user ${user.sub}`);
+
+        if (isDev) console.log(`Migration completed successfully for user ${user.sub}`);
       } catch (migrationError) {
         console.error(`Migration failed for user ${user.sub}:`, migrationError);
         // Don't clear old data if migration failed
@@ -218,10 +219,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // If no workouts exist and no old history, return empty
     if (workoutRows.length === 0) {
-      console.log(`[Migration Debug] No workouts found, oldHistory.length=${oldHistory.length}`);
+      if (isDev) console.log(`[Migration Debug] No workouts found, oldHistory.length=${oldHistory.length}`);
       // If we have old history but migration didn't run, return it
       if (oldHistory.length > 0) {
-        console.log(`[Migration Debug] Returning old history format as fallback`);
+        if (isDev) console.log(`[Migration Debug] Returning old history format as fallback`);
         res.status(200).json({ circuits, history: oldHistory });
         return;
       }

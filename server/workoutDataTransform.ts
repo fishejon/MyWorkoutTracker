@@ -68,13 +68,11 @@ export function normalizeWorkoutSession(
     created_at: new Date(),
   };
 
-  // Group ExerciseLogs by circuitId
-  // Each unique circuit gets its own round(s)
-  // If same circuit appears multiple times (multiple ExerciseLogs with same circuitId),
-  // each occurrence represents a separate round
+  // Group ExerciseLogs by circuitId (guard against missing or invalid logs)
+  const logs = Array.isArray(workoutSession.logs) ? workoutSession.logs : [];
   const circuitGroups = new Map<string, ExerciseLog[]>();
-  
-  for (const log of workoutSession.logs) {
+
+  for (const log of logs) {
     const circuitId = log.circuitId || 'unknown';
     if (!circuitGroups.has(circuitId)) {
       circuitGroups.set(circuitId, []);
@@ -192,9 +190,18 @@ export function denormalizeWorkouts(
       }
     }
 
+    // Handle date from DB (driver may return Date or string)
+    const dateVal = workout.date;
+    const dateStr =
+      typeof dateVal === 'string'
+        ? dateVal
+        : dateVal instanceof Date
+          ? dateVal.toISOString()
+          : new Date(dateVal as string | number).toISOString();
+
     return {
       id: workout.workout_id, // UUID from database
-      date: workout.date.toISOString(),
+      date: dateStr,
       circuitNames: Array.from(circuitNames),
       logs: exerciseLogs,
     };

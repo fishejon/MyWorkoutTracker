@@ -31,6 +31,7 @@ export interface ExerciseLog {
   sets: SetLog[];
   circuitId?: string; // Track which circuit this log belongs to
   circuitName?: string;
+  lastWorkoutSets?: SetLog[]; // Previous workout's sets data for display/reference
 }
 
 export interface WorkoutSession {

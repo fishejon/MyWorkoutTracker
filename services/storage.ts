@@ -1,5 +1,5 @@
 
-import { Circuit, WorkoutSession } from '../types';
+import { Circuit, WorkoutSession, ExerciseLog } from '../types';
 // Fix: STORAGE_KEYS is exported from constants.ts, not types.ts
 import { STORAGE_KEYS } from '../constants';
 
@@ -25,8 +25,12 @@ export const saveCircuits = (circuits: Circuit[]) => {
 };
 
 export const getCircuits = (): Circuit[] => {
-  const data = localStorage.getItem(nsKey(STORAGE_KEYS.CIRCUITS));
-  return data ? JSON.parse(data) : [];
+  try {
+    const data = localStorage.getItem(nsKey(STORAGE_KEYS.CIRCUITS));
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
 };
 
 export const saveSession = (session: WorkoutSession) => {
@@ -35,6 +39,44 @@ export const saveSession = (session: WorkoutSession) => {
 };
 
 export const getHistory = (): WorkoutSession[] => {
-  const data = localStorage.getItem(nsKey(STORAGE_KEYS.HISTORY));
-  return data ? JSON.parse(data) : [];
+  try {
+    const data = localStorage.getItem(nsKey(STORAGE_KEYS.HISTORY));
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Finds the most recent workout data for a specific exercise.
+ * Searches through workout history (sorted by date, most recent first).
+ * Matches by exerciseId first, then falls back to exerciseName.
+ * 
+ * @param exerciseId - The ID of the exercise to find
+ * @param exerciseName - The name of the exercise (used as fallback matching)
+ * @param history - Optional workout history array. If not provided, fetches from storage.
+ * @returns The most recent ExerciseLog for the exercise, or null if not found
+ */
+export const getLastWorkoutDataForExercise = (
+  exerciseId: string,
+  exerciseName: string,
+  history?: WorkoutSession[]
+): ExerciseLog | null => {
+  const workoutHistory = history ?? getHistory();
+  
+  // Search through history (already sorted most recent first)
+  for (const session of workoutHistory) {
+    for (const log of session.logs) {
+      // Match by exerciseId first (most reliable)
+      if (log.exerciseId === exerciseId) {
+        return log;
+      }
+      // Fallback to exerciseName matching
+      if (log.exerciseName === exerciseName) {
+        return log;
+      }
+    }
+  }
+  
+  return null;
 };

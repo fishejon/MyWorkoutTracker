@@ -100,48 +100,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         updated_at = now();
     `;
 
-    // Save workouts in normalized format using transaction
-    await sql.begin(async (tx) => {
-      // Delete existing workouts for this user (to handle updates)
-      // Cascade delete will automatically remove rounds and exercise_sets
-      await tx`
-        delete from workouts
-        where user_id = ${user.sub}
-      `;
-
-      // Insert each workout session as normalized rows
-      for (const workoutSession of deduplicatedHistory) {
-        const normalized = normalizeWorkoutSession(workoutSession, user.sub);
-
-        // Insert workout
+    // Save workouts in normalized format using transaction.
+    // If client sends empty history, do not wipe server (avoid accidental data loss).
+    if (deduplicatedHistory.length > 0) {
+      await sql.begin(async (tx) => {
+        // Delete existing workouts for this user (to handle updates)
+        // Cascade delete will automatically remove rounds and exercise_sets
         await tx`
-          insert into workouts (workout_id, user_id, date, created_at)
-          values (${normalized.workout.workout_id}, ${normalized.workout.user_id}, ${normalized.workout.date}, ${normalized.workout.created_at})
+          delete from workouts
+          where user_id = ${user.sub}
         `;
 
-        // Insert rounds and sets for this workout
-        for (const { round, sets } of normalized.rounds) {
+        // Insert each workout session as normalized rows
+        for (const workoutSession of deduplicatedHistory) {
+          const normalized = normalizeWorkoutSession(workoutSession, user.sub);
+
+          // Insert workout
           await tx`
-            insert into rounds (round_id, workout_id, circuit_id, circuit_name, round_number, created_at)
-            values (${round.round_id}, ${round.workout_id}, ${round.circuit_id}, ${round.circuit_name}, ${round.round_number}, ${round.created_at})
+            insert into workouts (workout_id, user_id, date, created_at)
+            values (${normalized.workout.workout_id}, ${normalized.workout.user_id}, ${normalized.workout.date}, ${normalized.workout.created_at})
           `;
 
-          // Insert sets for this round
-          for (const set of sets) {
+          // Insert rounds and sets for this workout
+          for (const { round, sets } of normalized.rounds) {
             await tx`
-              insert into exercise_sets (
-                set_id, round_id, exercise_id, exercise_name, exercise_type,
-                set_index, value, weight, created_at
-              )
-              values (
-                ${set.set_id}, ${set.round_id}, ${set.exercise_id}, ${set.exercise_name},
-                ${set.exercise_type}, ${set.set_index}, ${set.value}, ${set.weight}, ${set.created_at}
-              )
+              insert into rounds (round_id, workout_id, circuit_id, circuit_name, round_number, created_at)
+              values (${round.round_id}, ${round.workout_id}, ${round.circuit_id}, ${round.circuit_name}, ${round.round_number}, ${round.created_at})
             `;
+
+            // Insert sets for this round
+            for (const set of sets) {
+              await tx`
+                insert into exercise_sets (
+                  set_id, round_id, exercise_id, exercise_name, exercise_type,
+                  set_index, value, weight, created_at
+                )
+                values (
+                  ${set.set_id}, ${set.round_id}, ${set.exercise_id}, ${set.exercise_name},
+                  ${set.exercise_type}, ${set.set_index}, ${set.value}, ${set.weight}, ${set.created_at}
+                )
+              `;
+            }
           }
         }
-      }
-    });
+      });
+    }
 
     res.status(200).json({ ok: true });
   } catch (err) {

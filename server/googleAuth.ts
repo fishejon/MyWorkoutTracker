@@ -47,7 +47,7 @@ export async function verifyGoogleIdToken(idToken: string): Promise<VerifiedGoog
     emailVerified,
     name: payload.name || undefined,
     picture: payload.picture || undefined,
-    hostedDomain: (payload as any).hd || undefined,
+    hostedDomain: ('hd' in payload && typeof (payload as { hd?: string }).hd === 'string') ? (payload as { hd: string }).hd : undefined,
   };
 }
 

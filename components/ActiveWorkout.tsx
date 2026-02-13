@@ -1,19 +1,28 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Circuit, WorkoutSession, ExerciseLog } from '../types';
 import { CheckCircle2, ChevronLeft, Timer, Weight, Repeat, Zap, LayoutGrid, Play, Square, Bell, Plus, Minus } from 'lucide-react';
+import { getHistory, getLastWorkoutDataForExercise } from '../services/storage';
+
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
 
 interface ActiveWorkoutProps {
   circuits: Circuit[];
   onFinish: (session: WorkoutSession) => void;
   onCancel: () => void;
+  history?: WorkoutSession[]; // Optional workout history for showing last workout data
 }
 
 const TIMER_PRESETS = [15, 30, 45, 60, 90];
 
 const playAlarmSound = () => {
   try {
-    const context = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const ContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!ContextClass) return;
+    const context = new ContextClass();
     const oscillator = context.createOscillator();
     const gainNode = context.createGain();
 
@@ -27,45 +36,53 @@ const playAlarmSound = () => {
 
     oscillator.start(context.currentTime);
     oscillator.stop(context.currentTime + 1.5);
-  } catch (e) {
-    console.warn("Audio Context blocked or failed:", e);
+  } catch {
+    // Audio Context may be blocked by browser policy; fail silently
   }
 };
 
-const SetTimer: React.FC<{ 
-  initialSeconds: number; 
+const SetTimer: React.FC<{
+  initialSeconds: number;
   onComplete: () => void;
   onUpdateValue: (val: number) => void;
 }> = ({ initialSeconds, onComplete, onUpdateValue }) => {
   const [timeLeft, setTimeLeft] = useState(initialSeconds);
   const [isRunning, setIsRunning] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
-  // Sync internal state if external value changes while not running
+  // Sync display when preset changes and timer is not running
   useEffect(() => {
-    if (!isRunning) {
-      setTimeLeft(initialSeconds);
-    }
+    if (!isRunning) setTimeLeft(initialSeconds);
   }, [initialSeconds, isRunning]);
 
+  // Single interval when running; ref for onComplete avoids effect churn
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      timerRef.current = window.setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            if (timerRef.current) clearInterval(timerRef.current);
-            onComplete();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+    if (!isRunning) {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
     }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isRunning, timeLeft, onComplete]);
+    timerRef.current = window.setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          onCompleteRef.current?.();
+          setIsRunning(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [isRunning]); // eslint-disable-line react-hooks/exhaustive-deps -- timeLeft intentionally excluded to avoid recreating interval every second
 
   const toggleTimer = () => {
     if (timeLeft <= 0) setTimeLeft(initialSeconds);
@@ -131,22 +148,33 @@ const SetTimer: React.FC<{
   );
 };
 
-const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCancel }) => {
+const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCancel, history }) => {
+  // Use provided history or fetch from storage if not provided
+  const workoutHistory = history ?? getHistory();
+  
   const [logs, setLogs] = useState<ExerciseLog[]>(() => {
     const initialLogs: ExerciseLog[] = [];
     circuits.forEach(circuit => {
       circuit.exercises.forEach(ex => {
+        // Find last workout data for this exercise
+        const lastWorkoutData = getLastWorkoutDataForExercise(ex.id, ex.name, workoutHistory);
+        
+        // Initialize sets with zeros; last workout values are used only as placeholders (see lastWorkoutSets)
+        const sets = Array.from({ length: ex.sets }).map((_, i) => ({
+          setIndex: i,
+          value: 0,
+          weight: ex.type === 'weight' ? 0 : undefined
+        }));
+        
         initialLogs.push({
           exerciseId: ex.id,
           exerciseName: ex.name,
           type: ex.type,
           circuitId: circuit.id,
           circuitName: circuit.name,
-          sets: Array.from({ length: ex.sets }).map((_, i) => ({
-            setIndex: i,
-            value: ex.type === 'duration' ? 0 : 0, // Could pull from default if needed
-            weight: ex.type === 'weight' ? 0 : undefined
-          }))
+          sets,
+          // Store last workout sets for display purposes
+          lastWorkoutSets: lastWorkoutData?.sets
         });
       });
     });
@@ -281,40 +309,74 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                       </tr>
                     </thead>
                     <tbody>
-                      {log.sets.map((set, setIdx) => (
-                        <tr key={setIdx}>
-                          <td className="text-center font-black text-slate-200 text-xl">{setIdx + 1}</td>
-                          {log.type === 'weight' && (
-                            <td className="px-1">
-                              <input 
-                                type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*"
-                                className="w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black text-slate-900 outline-none focus:border-indigo-500 focus:bg-white transition-all text-center"
-                                placeholder="0"
-                                value={set.weight === 0 ? '' : set.weight}
-                                onChange={(e) => updateLog(logIdx, setIdx, 'weight', e.target.value)}
-                              />
-                            </td>
-                          )}
-                          <td className="px-1">
-                            <input 
-                              type="text" inputMode="numeric" pattern="[0-9]*"
-                              className={`w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black text-slate-900 outline-none focus:bg-white transition-all text-center ${log.type === 'duration' ? 'focus:border-amber-500' : 'focus:border-emerald-500'}`}
-                              placeholder="0"
-                              value={set.value === 0 ? '' : set.value}
-                              onChange={(e) => updateLog(logIdx, setIdx, 'value', e.target.value)}
-                            />
-                          </td>
-                          {log.type === 'duration' && (
-                            <td className="px-1 align-middle">
-                              <SetTimer 
-                                initialSeconds={set.value} 
-                                onComplete={() => playAlarmSound()}
-                                onUpdateValue={(newVal) => updateLog(logIdx, setIdx, 'value', newVal)}
-                              />
-                            </td>
-                          )}
-                        </tr>
-                      ))}
+                      {log.sets.map((set, setIdx) => {
+                        // Get last workout data for this set if available
+                        const lastSet = log.lastWorkoutSets?.[setIdx];
+                        const hasLastData = lastSet && (lastSet.value > 0 || (lastSet.weight && lastSet.weight > 0));
+                        
+                        // Format last workout display text
+                        const formatLastWorkout = () => {
+                          if (!hasLastData) return null;
+                          if (log.type === 'weight' && lastSet.weight) {
+                            return `Last: ${lastSet.weight} lbs × ${lastSet.value} reps`;
+                          } else if (log.type === 'reps') {
+                            return `Last: ${lastSet.value} reps`;
+                          } else if (log.type === 'duration') {
+                            return `Last: ${lastSet.value}s`;
+                          }
+                          return null;
+                        };
+                        
+                        const lastWorkoutText = formatLastWorkout();
+                        const colSpan = log.type === 'duration' ? 4 : (log.type === 'weight' ? 3 : 2);
+                        
+                        return (
+                          <React.Fragment key={setIdx}>
+                            <tr>
+                              <td className="text-center font-black text-slate-200 text-xl">{setIdx + 1}</td>
+                              {log.type === 'weight' && (
+                                <td className="px-1">
+                                  <input 
+                                    type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*"
+                                    className="w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white transition-all text-center"
+                                    placeholder={lastSet?.weight != null ? String(lastSet.weight) : '0'}
+                                    value={set.weight === 0 ? '' : set.weight}
+                                    onChange={(e) => updateLog(logIdx, setIdx, 'weight', e.target.value)}
+                                  />
+                                </td>
+                              )}
+                              <td className="px-1">
+                                <input 
+                                  type="text" inputMode="numeric" pattern="[0-9]*"
+                                  className={`w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white transition-all text-center ${log.type === 'duration' ? 'focus:border-amber-500' : 'focus:border-emerald-500'}`}
+                                  placeholder={lastSet?.value != null ? String(lastSet.value) : '0'}
+                                  value={set.value === 0 ? '' : set.value}
+                                  onChange={(e) => updateLog(logIdx, setIdx, 'value', e.target.value)}
+                                />
+                              </td>
+                              {log.type === 'duration' && (
+                                <td className="px-1 align-middle">
+                                  <SetTimer 
+                                    initialSeconds={set.value} 
+                                    onComplete={() => playAlarmSound()}
+                                    onUpdateValue={(newVal) => updateLog(logIdx, setIdx, 'value', newVal)}
+                                  />
+                                </td>
+                              )}
+                            </tr>
+                            {/* Show "Last: …" row only for duration (timer has no placeholder); weight/reps use input placeholders */}
+                            {log.type === 'duration' && lastWorkoutText && (
+                              <tr>
+                                <td colSpan={colSpan} className="px-2 pb-2">
+                                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider text-center">
+                                    {lastWorkoutText}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

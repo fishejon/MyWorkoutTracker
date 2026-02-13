@@ -307,6 +307,7 @@ const App: React.FC = () => {
         return activeCircuits.length > 0 ? (
           <ActiveWorkout 
             circuits={activeCircuits} 
+            history={history}
             onFinish={handleFinishWorkout} 
             onCancel={() => {
               setActiveCircuits([]);
@@ -399,7 +400,6 @@ const App: React.FC = () => {
                 }}
                 onError={() => {
                   setAuthError('Google login failed.');
-                  console.error('Google login failed');
                 }}
                 useOneTap
               />
