@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, History as HistoryIcon, BarChart3, Dumbbell, Plus } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
-import { AppView, Circuit, WorkoutSession } from './types';
+import { AppView, Circuit, WorkoutSession, CustomExercise } from './types';
 import {
   getCircuits,
   getHistory,
@@ -31,6 +31,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<AppView>('dashboard');
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [history, setHistory] = useState<WorkoutSession[]>([]);
+  const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
   const [activeCircuits, setActiveCircuits] = useState<Circuit[]>([]);
   const [editingCircuit, setEditingCircuit] = useState<Circuit | null>(null);
   const [idToken, setIdToken] = useState<string | null>(() => {
@@ -42,6 +43,7 @@ const App: React.FC = () => {
   });
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
   const [user, setUser] = useState<AuthedUser | null>(null);
 
   const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
@@ -54,6 +56,8 @@ const App: React.FC = () => {
     setStorageNamespace(null);
     setCircuits([]);
     setHistory([]);
+    setCustomExercises([]);
+    setDataError(null);
     setActiveCircuits([]);
     setView('dashboard');
 
@@ -137,19 +141,37 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idToken, hasGoogleClientId]);
 
-  const persistUserData = async (nextCircuits: Circuit[], nextHistory: WorkoutSession[]) => {
+  const persistUserData = async (
+    nextCircuits: Circuit[],
+    nextHistory: WorkoutSession[],
+    nextCustomExercises?: CustomExercise[],
+  ) => {
     if (authStatus !== 'authed' || !idToken) return;
 
     try {
-      await fetch('/api/data/save', {
+      const body: { circuits: Circuit[]; history: WorkoutSession[]; customExercises?: CustomExercise[] } = {
+        circuits: nextCircuits,
+        history: nextHistory,
+      };
+      if (nextCustomExercises !== undefined) {
+        body.customExercises = nextCustomExercises;
+      }
+      const resp = await fetch('/api/data/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ circuits: nextCircuits, history: nextHistory }),
+        body: JSON.stringify(body),
       });
+      if (!resp.ok) {
+        setDataError('Couldn’t save. Changes may not sync.');
+        console.warn('Failed to persist user data:', resp.status);
+        return;
+      }
+      setDataError(null);
     } catch (e) {
+      setDataError('Couldn’t save. Changes may not sync.');
       console.warn('Failed to persist user data:', e);
     }
   };
@@ -172,8 +194,8 @@ const App: React.FC = () => {
         });
 
         if (!resp.ok) {
-          // Fall back to local-only.
           if (!cancelled) {
+            setDataError('Couldn’t load latest data. Showing cached.');
             setCircuits(localCircuits);
             setHistory(localHistory);
             setView('dashboard');
@@ -181,10 +203,17 @@ const App: React.FC = () => {
           return;
         }
 
-        const data = (await resp.json()) as { circuits: Circuit[]; history: WorkoutSession[] };
+        if (!cancelled) setDataError(null);
+
+        const data = (await resp.json()) as {
+          circuits: Circuit[];
+          history: WorkoutSession[];
+          customExercises?: CustomExercise[];
+        };
 
         const serverCircuits = Array.isArray(data.circuits) ? data.circuits : [];
         const serverHistory = Array.isArray(data.history) ? data.history : [];
+        const serverCustomExercises = Array.isArray(data.customExercises) ? data.customExercises : [];
 
         // If server has nothing yet but this device has local data, push local to server.
         const shouldUploadLocal =
@@ -192,19 +221,22 @@ const App: React.FC = () => {
 
         const nextCircuits = shouldUploadLocal ? localCircuits : serverCircuits;
         const nextHistory = shouldUploadLocal ? localHistory : serverHistory;
+        const nextCustomExercises = shouldUploadLocal ? [] : serverCustomExercises;
 
         if (!cancelled) {
           setCircuits(nextCircuits);
           setHistory(nextHistory);
+          setCustomExercises(nextCustomExercises);
           setView('dashboard');
         }
 
         if (shouldUploadLocal) {
-          await persistUserData(localCircuits, localHistory);
+          await persistUserData(localCircuits, localHistory, []);
         }
       } catch (e) {
         console.warn('Failed to sync user data, falling back to local:', e);
         if (!cancelled) {
+          setDataError('Couldn’t load latest data. Showing cached.');
           setCircuits(localCircuits);
           setHistory(localHistory);
           setView('dashboard');
@@ -222,7 +254,7 @@ const App: React.FC = () => {
     const updated = [...circuits, newCircuit];
     setCircuits(updated);
     saveCircuits(updated);
-    void persistUserData(updated, history);
+    void persistUserData(updated, history, customExercises);
     setEditingCircuit(null);
     setView('dashboard');
   };
@@ -231,7 +263,7 @@ const App: React.FC = () => {
     const updated = circuits.map(c => (c.id === updatedCircuit.id ? updatedCircuit : c));
     setCircuits(updated);
     saveCircuits(updated);
-    void persistUserData(updated, history);
+    void persistUserData(updated, history, customExercises);
     setEditingCircuit(null);
     setView('dashboard');
   };
@@ -240,7 +272,7 @@ const App: React.FC = () => {
     const updated = circuits.filter(c => c.id !== id);
     setCircuits(updated);
     saveCircuits(updated);
-    void persistUserData(updated, history);
+    void persistUserData(updated, history, customExercises);
 
     if (editingCircuit?.id === id) {
       setEditingCircuit(null);
@@ -253,11 +285,19 @@ const App: React.FC = () => {
     setView('active');
   };
 
+  const handleSaveCustomExercise = (ex: CustomExercise) => {
+    setCustomExercises(prev => {
+      const next = [...prev, ex];
+      void persistUserData(circuits, history, next);
+      return next;
+    });
+  };
+
   const handleFinishWorkout = (session: WorkoutSession) => {
     saveSession(session);
     setHistory(prev => {
       const next = [session, ...prev];
-      void persistUserData(circuits, next);
+      void persistUserData(circuits, next, customExercises);
       return next;
     });
     setActiveCircuits([]);
@@ -295,6 +335,8 @@ const App: React.FC = () => {
         return (
           <CircuitBuilder
             initialCircuit={editingCircuit}
+            customExercises={customExercises}
+            onSaveCustomExercise={handleSaveCustomExercise}
             onSave={handleCreateCircuit}
             onUpdate={handleUpdateCircuit}
             onCancel={() => {
@@ -457,6 +499,13 @@ const App: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {dataError && (
+        <div className="flex-shrink-0 px-4 py-2 bg-amber-100 border-b border-amber-200 text-amber-900 text-sm font-medium flex items-center justify-between gap-2">
+          <span>{dataError}</span>
+          <button type="button" onClick={() => setDataError(null)} className="text-amber-700 hover:text-amber-900 font-bold" aria-label="Dismiss">×</button>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto pb-32">

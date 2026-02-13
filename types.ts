@@ -8,6 +8,11 @@ export interface Exercise {
   defaultSets: number;
 }
 
+/** User-created exercise persisted per user; includes muscle group for library grouping. */
+export interface CustomExercise extends Exercise {
+  muscleGroup: string;
+}
+
 export interface CircuitExercise extends Exercise {
   sets: number;
 }

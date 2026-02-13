@@ -2,7 +2,7 @@ import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../serve
 import { ensureAppSchema, getSql } from '../../server/db.js';
 import { denormalizeWorkouts, normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
 import { WorkoutRow, RoundRow, ExerciseSetRow } from '../../server/workoutDataTransform.js';
-import { WorkoutSession } from '../../types.js';
+import { WorkoutSession, CustomExercise } from '../../types.js';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -53,12 +53,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Column might already exist or table doesn't exist yet - ignore
     }
 
-    // Get circuits and check for old history data
+    // Get circuits, history, and custom exercises
     const userDataRows = await sql<{
       circuits: unknown;
       history: unknown;
+      custom_exercises?: unknown;
     }[]>`
-      select circuits, history
+      select circuits, history, custom_exercises
       from user_data
       where sub = ${user.sub}
     `;
@@ -66,6 +67,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const circuits = userDataRows.length > 0 && Array.isArray(userDataRows[0].circuits)
       ? userDataRows[0].circuits
       : [];
+
+    // Validate custom_exercises: must be array of { id, name, type, defaultSets, muscleGroup }
+    const rawCustom = userDataRows.length > 0 && Array.isArray(userDataRows[0].custom_exercises)
+      ? (userDataRows[0].custom_exercises as unknown[])
+      : [];
+    const customExercises = rawCustom.filter((item): item is CustomExercise => {
+      if (!item || typeof item !== 'object') return false;
+      const o = item as Record<string, unknown>;
+      return (
+        typeof o.id === 'string' &&
+        typeof o.name === 'string' &&
+        (o.type === 'weight' || o.type === 'reps' || o.type === 'duration') &&
+        typeof o.defaultSets === 'number' &&
+        typeof o.muscleGroup === 'string'
+      );
+    });
 
     // Check if user has old JSONB history data that needs migration
     // Validate old history data structure before casting
@@ -144,12 +161,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (isDev) console.log(`Migration completed successfully for user ${user.sub}`);
       } catch (migrationError) {
-        console.error(`Migration failed for user ${user.sub}:`, migrationError);
+        if (isDev) console.error(`Migration failed for user ${user.sub}:`, migrationError);
         // Don't clear old data if migration failed
         // Return old data format so user doesn't lose data
-        res.status(200).json({ 
-          circuits, 
-          history: oldHistory // Return old format if migration fails
+        res.status(200).json({
+          circuits,
+          history: oldHistory, // Return old format if migration fails
+          customExercises,
         });
         return;
       }
@@ -204,14 +222,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           `;
         }
         
-        res.status(200).json({ circuits, history });
+        res.status(200).json({ circuits, history, customExercises });
         return;
       } else {
         // Migration ran but no data was created - don't clear old data
-        console.error(`[Migration Debug] Migration completed but no workouts were created for user ${user.sub}`);
+        if (isDev) console.error(`[Migration Debug] Migration completed but no workouts were created for user ${user.sub}`);
         // Return old history if migration failed
         if (oldHistory.length > 0) {
-          res.status(200).json({ circuits, history: oldHistory });
+          res.status(200).json({ circuits, history: oldHistory, customExercises });
           return;
         }
       }
@@ -223,10 +241,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // If we have old history but migration didn't run, return it
       if (oldHistory.length > 0) {
         if (isDev) console.log(`[Migration Debug] Returning old history format as fallback`);
-        res.status(200).json({ circuits, history: oldHistory });
+        res.status(200).json({ circuits, history: oldHistory, customExercises });
         return;
       }
-      res.status(200).json({ circuits, history: [] });
+      res.status(200).json({ circuits, history: [], customExercises });
       return;
     }
 
@@ -274,6 +292,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({
       circuits,
       history,
+      customExercises,
     });
   } catch (err) {
     console.error('data/get error', err);

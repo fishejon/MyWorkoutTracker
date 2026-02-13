@@ -1,7 +1,37 @@
 import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../server/googleAuth.js';
 import { ensureAppSchema, getSql } from '../../server/db.js';
 import { normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
-import { WorkoutSession } from '../../types.js';
+import { WorkoutSession, CustomExercise } from '../../types.js';
+
+const MAX_CUSTOM_EXERCISES = 500;
+const MAX_EXERCISE_NAME_LENGTH = 200;
+const MAX_MUSCLE_GROUP_LENGTH = 100;
+
+/** Validate and sanitize custom exercises from client; return only valid entries. */
+function validateCustomExercises(raw: unknown[]): CustomExercise[] {
+  const valid: CustomExercise[] = [];
+  const validTypes = ['weight', 'reps', 'duration'] as const;
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const o = item as Record<string, unknown>;
+    if (
+      typeof o.id !== 'string' || o.id.length > 200 ||
+      typeof o.name !== 'string' || o.name.length > MAX_EXERCISE_NAME_LENGTH ||
+      !validTypes.includes(o.type as (typeof validTypes)[number]) ||
+      typeof o.defaultSets !== 'number' || o.defaultSets < 1 || o.defaultSets > 99 ||
+      typeof o.muscleGroup !== 'string' || o.muscleGroup.length > MAX_MUSCLE_GROUP_LENGTH
+    ) continue;
+    valid.push({
+      id: o.id,
+      name: o.name.trim(),
+      type: o.type as CustomExercise['type'],
+      defaultSets: Math.floor(Number(o.defaultSets)),
+      muscleGroup: (o.muscleGroup as string).trim(),
+    });
+    if (valid.length >= MAX_CUSTOM_EXERCISES) break;
+  }
+  return valid;
+}
 
 type VercelRequest = {
   method?: string;
@@ -18,6 +48,7 @@ type VercelResponse = {
 type SaveBody = {
   circuits?: unknown;
   history?: unknown;
+  customExercises?: unknown;
 };
 
 function parseBody(body: unknown): SaveBody {
@@ -62,11 +93,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await ensureAppSchema();
 
-    const { circuits, history } = parseBody(req.body);
+    const { circuits, history, customExercises: rawCustomExercises } = parseBody(req.body);
     if (!Array.isArray(circuits) || !Array.isArray(history)) {
       res.status(400).send('Invalid body: expected { circuits: Circuit[], history: WorkoutSession[] }');
       return;
     }
+    // Optional: persist user custom exercises when provided (validated and capped)
+    const customExercises = Array.isArray(rawCustomExercises)
+      ? validateCustomExercises(rawCustomExercises)
+      : undefined;
 
     // Validate and deduplicate workout sessions by ID
     const uniqueWorkouts = new Map<string, WorkoutSession>();
@@ -90,15 +125,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       do update set email = excluded.email, last_seen_at = now();
     `;
 
-    // Save circuits to JSONB (unchanged)
-    await sql`
-      insert into user_data (sub, circuits, updated_at)
-      values (${user.sub}, ${sql.json(circuits)}, now())
-      on conflict (sub)
-      do update set
-        circuits = excluded.circuits,
-        updated_at = now();
-    `;
+    // Save circuits (and optionally custom_exercises) to user_data
+    if (customExercises !== undefined) {
+      // Serialize to plain JSON for jsonb; validated shape is safe for postgres (postgres JSONValue type is strict)
+      const customExercisesJson = JSON.parse(JSON.stringify(customExercises));
+      await sql`
+        insert into user_data (sub, circuits, custom_exercises, updated_at)
+        values (${user.sub}, ${sql.json(circuits)}, ${sql.json(customExercisesJson)}, now())
+        on conflict (sub)
+        do update set
+          circuits = excluded.circuits,
+          custom_exercises = excluded.custom_exercises,
+          updated_at = now();
+      `;
+    } else {
+      await sql`
+        insert into user_data (sub, circuits, updated_at)
+        values (${user.sub}, ${sql.json(circuits)}, now())
+        on conflict (sub)
+        do update set
+          circuits = excluded.circuits,
+          updated_at = now();
+      `;
+    }
 
     // Save workouts in normalized format using transaction.
     // If client sends empty history, do not wipe server (avoid accidental data loss).

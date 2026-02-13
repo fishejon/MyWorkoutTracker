@@ -1,17 +1,26 @@
 
-import React, { useEffect, useState } from 'react';
-import { Circuit, CircuitExercise, ExerciseType, Exercise } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Circuit, CircuitExercise, ExerciseType, Exercise, CustomExercise } from '../types';
 import { EXERCISE_GROUPS } from '../constants';
-import { Search, Plus, X, ChevronRight, Layers, ArrowLeft, Keyboard } from 'lucide-react';
+import { Search, Plus, X, ChevronRight, Layers, ArrowLeft } from 'lucide-react';
 
 interface CircuitBuilderProps {
   initialCircuit?: Circuit | null;
+  customExercises: CustomExercise[];
+  onSaveCustomExercise: (ex: CustomExercise) => void;
   onSave: (circuit: Circuit) => void;
   onUpdate: (circuit: Circuit) => void;
   onCancel: () => void;
 }
 
-const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave, onUpdate, onCancel }) => {
+const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
+  initialCircuit,
+  customExercises,
+  onSaveCustomExercise,
+  onSave,
+  onUpdate,
+  onCancel,
+}) => {
   const [name, setName] = useState(initialCircuit?.name ?? '');
   const [selectedExercises, setSelectedExercises] = useState<CircuitExercise[]>(initialCircuit?.exercises ?? []);
   const [searchQuery, setSearchQuery] = useState('');
@@ -28,12 +37,21 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave,
     setIsCustomMode(false);
     setCustomName('');
     setCustomType('weight');
+    setCustomMuscleGroup(null);
+    setSaveValidationError(null);
   }, [initialCircuit]);
+
+  // Clear validation message when form becomes valid
+  useEffect(() => {
+    if (name.trim() && selectedExercises.length > 0) setSaveValidationError(null);
+  }, [name, selectedExercises]);
   
   // Custom Exercise Mode
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customType, setCustomType] = useState<ExerciseType>('weight');
+  const [customMuscleGroup, setCustomMuscleGroup] = useState<string | null>(null);
+  const [saveValidationError, setSaveValidationError] = useState<string | null>(null);
 
   const addExercise = (ex: Exercise) => {
     const existing = selectedExercises.find(item => item.id === ex.id);
@@ -56,9 +74,10 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave,
 
   const handleSave = () => {
     if (!name.trim() || selectedExercises.length === 0) {
-      alert("Please enter a name and select at least one exercise.");
+      setSaveValidationError('Enter a circuit name and add at least one exercise.');
       return;
     }
+    setSaveValidationError(null);
 
     const next: Circuit = {
       id: initialCircuit?.id ?? Date.now().toString(),
@@ -74,23 +93,30 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave,
   };
 
   const addCustomExercise = () => {
-    if (!customName.trim()) return;
-    const newEx: Exercise = {
+    if (!customName.trim() || !customMuscleGroup) return;
+    const newEx: CustomExercise = {
       id: `custom-${Date.now()}`,
       name: customName.trim(),
       type: customType,
-      defaultSets: 3
+      defaultSets: 3,
+      muscleGroup: customMuscleGroup,
     };
     addExercise(newEx);
+    onSaveCustomExercise(newEx);
     setCustomName('');
+    setCustomMuscleGroup(null);
     setIsCustomMode(false);
   };
 
-  const currentGroupExercises = selectedGroup 
-    ? EXERCISE_GROUPS.find(g => g.muscleGroup === selectedGroup)?.exercises.filter(ex => 
-        ex.name.toLowerCase().includes(searchQuery.toLowerCase())
-      ) || []
-    : [];
+  // Merge built-in exercises with user custom exercises for the selected group; filter by search.
+  const currentGroupExercises = useMemo(() => {
+    if (!selectedGroup) return [];
+    const builtIn = EXERCISE_GROUPS.find(g => g.muscleGroup === selectedGroup)?.exercises ?? [];
+    const customs = customExercises.filter(c => c.muscleGroup === selectedGroup);
+    const merged = [...builtIn, ...customs].sort((a, b) => a.name.localeCompare(b.name));
+    const q = searchQuery.toLowerCase().trim();
+    return q ? merged.filter(ex => ex.name.toLowerCase().includes(q)) : merged;
+  }, [selectedGroup, customExercises, searchQuery]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -168,7 +194,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave,
                 <span className="text-xs font-black uppercase tracking-widest">New Custom Exercise</span>
                 <button onClick={() => setIsCustomMode(false)}><X className="w-4 h-4" /></button>
               </div>
-              <input 
+              <input
                 autoFocus
                 type="text"
                 placeholder="Exercise name..."
@@ -176,6 +202,21 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave,
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
               />
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200 block mb-2">Muscle group</span>
+                <div className="flex flex-wrap gap-2">
+                  {EXERCISE_GROUPS.map(g => (
+                    <button
+                      key={g.muscleGroup}
+                      type="button"
+                      onClick={() => setCustomMuscleGroup(g.muscleGroup)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${customMuscleGroup === g.muscleGroup ? 'bg-white text-indigo-600 shadow-sm' : 'bg-indigo-500/50 text-indigo-100 hover:bg-indigo-500'}`}
+                    >
+                      {g.muscleGroup}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex gap-2">
                 {(['weight', 'reps', 'duration'] as ExerciseType[]).map(type => (
                   <button
@@ -187,9 +228,10 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave,
                   </button>
                 ))}
               </div>
-              <button 
+              <button
                 onClick={addCustomExercise}
-                className="w-full py-3 bg-white text-indigo-600 rounded-xl font-black shadow-lg"
+                disabled={!customName.trim() || !customMuscleGroup}
+                className="w-full py-3 bg-white text-indigo-600 rounded-xl font-black shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ADD TO CIRCUIT
               </button>
@@ -198,19 +240,23 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave,
 
           {!selectedGroup ? (
             <div className="grid grid-cols-2 gap-3">
-              {EXERCISE_GROUPS.map(group => (
-                <button
-                  key={group.muscleGroup}
-                  onClick={() => setSelectedGroup(group.muscleGroup)}
-                  className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center gap-2 hover:border-indigo-300 hover:bg-indigo-50 transition-all group active:scale-95"
-                >
-                  <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-white transition-colors">
-                    <ChevronRight className="w-5 h-5 text-indigo-500" />
-                  </div>
-                  <span className="text-sm font-bold text-slate-700">{group.muscleGroup}</span>
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{group.exercises.length} Options</span>
-                </button>
-              ))}
+              {EXERCISE_GROUPS.map(group => {
+                const customCount = customExercises.filter(c => c.muscleGroup === group.muscleGroup).length;
+                const total = group.exercises.length + customCount;
+                return (
+                  <button
+                    key={group.muscleGroup}
+                    onClick={() => setSelectedGroup(group.muscleGroup)}
+                    className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center gap-2 hover:border-indigo-300 hover:bg-indigo-50 transition-all group active:scale-95"
+                  >
+                    <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-white transition-colors">
+                      <ChevronRight className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-700">{group.muscleGroup}</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{total} Options</span>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="animate-in slide-in-from-right-4 duration-300">
@@ -259,11 +305,16 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({ initialCircuit, onSave,
       </div>
 
       {/* Footer */}
-      <div className="p-4 bg-white border-t border-slate-200 sticky bottom-0 z-40 flex gap-3 shadow-2xl">
-        <button onClick={onCancel} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">Cancel</button>
-        <button onClick={handleSave} disabled={!name.trim() || selectedExercises.length === 0} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg disabled:opacity-50 transition-all active:scale-[0.98]">
-          {isEditing ? 'SAVE CHANGES' : 'CREATE CIRCUIT'}
-        </button>
+      <div className="p-4 bg-white border-t border-slate-200 sticky bottom-0 z-40 flex flex-col gap-3 shadow-2xl">
+        {saveValidationError && (
+          <p className="text-sm text-amber-700 font-medium" role="alert">{saveValidationError}</p>
+        )}
+        <div className="flex gap-3">
+          <button onClick={onCancel} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">Cancel</button>
+          <button onClick={handleSave} disabled={!name.trim() || selectedExercises.length === 0} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg disabled:opacity-50 transition-all active:scale-[0.98]">
+            {isEditing ? 'SAVE CHANGES' : 'CREATE CIRCUIT'}
+          </button>
+        </div>
       </div>
     </div>
   );

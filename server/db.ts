@@ -83,6 +83,11 @@ export async function ensureAppSchema(): Promise<void> {
     );
   `;
 
+  // User-defined exercises per muscle group (backward compatible: default empty)
+  await client`
+    alter table user_data add column if not exists custom_exercises jsonb not null default '[]'::jsonb;
+  `;
+
   // Normalized workout storage tables
   // Workouts table: one row per workout session
   // Note: workout_id is UUID, but we generate it in code to ensure consistency
