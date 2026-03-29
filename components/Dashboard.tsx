@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Circuit, WorkoutSession, Program } from '../types';
-import { Play, Trash2, PlusCircle, Pencil, Check, Upload, BookOpen, ChevronRight } from 'lucide-react';
+import { Play, Trash2, PlusCircle, Pencil, Check, Upload, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DashboardProps {
   circuits: Circuit[];
@@ -9,13 +9,120 @@ interface DashboardProps {
   programs: Program[];
   onStart: (selectedCircuits: Circuit[]) => void;
   onDelete: (id: string) => void;
+  onDeleteProgram: (id: string) => void;
   onEdit: (circuit: Circuit) => void;
   onNew: () => void;
   onImportCSV: () => void;
   onOpenProgram: (program: Program) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ circuits, history, programs, onStart, onDelete, onEdit, onNew, onImportCSV, onOpenProgram }) => {
+// ─── Workout Calendar ────────────────────────────────────────────────────────
+
+const MONTH_NAMES = [
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
+];
+
+const WorkoutCalendar: React.FC<{ history: WorkoutSession[] }> = ({ history }) => {
+  const [viewDate, setViewDate] = useState(() => new Date());
+
+  const workoutDays = useMemo(() => {
+    const days = new Set<string>();
+    for (const session of history) {
+      try {
+        const d = new Date(session.date);
+        days.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      } catch { /* skip malformed dates */ }
+    }
+    return days;
+  }, [history]);
+
+  const year  = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+
+  const firstDow   = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // Build 7-column grid cells (null = empty leading/trailing cell)
+  const cells: (number | null)[] = [
+    ...Array<null>(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-bold text-slate-800">Workout Calendar</h4>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setViewDate(new Date(year, month - 1, 1))}
+            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-xs font-black text-slate-600 min-w-[90px] text-center">
+            {MONTH_NAMES[month]} {year}
+          </span>
+          <button
+            onClick={() => setViewDate(new Date(year, month + 1, 1))}
+            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+            aria-label="Next month"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {['S','M','T','W','T','F','S'].map((d, i) => (
+          <div key={i} className="text-center text-[9px] font-black text-slate-300 uppercase tracking-wider py-1">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Date cells */}
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {cells.map((day, i) => {
+          if (day === null) return <div key={i} />;
+          const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          const isWorkout = workoutDays.has(dateStr);
+          const isToday   = dateStr === todayStr;
+          return (
+            <div key={i} className="flex items-center justify-center py-0.5">
+              <div className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold ${
+                isWorkout
+                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                  : isToday
+                  ? 'ring-2 ring-indigo-300 text-indigo-600'
+                  : 'text-slate-500'
+              }`}>
+                {day}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      {workoutDays.size > 0 && (
+        <div className="mt-3 flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
+          <span className="text-[10px] text-slate-400 font-medium">Workout completed</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Dashboard: React.FC<DashboardProps> = ({ circuits, history, programs, onStart, onDelete, onDeleteProgram, onEdit, onNew, onImportCSV, onOpenProgram }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const toggleSelection = (id: string) => {
@@ -61,17 +168,17 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, programs, onSt
                 ? Math.round(program.schedule.length / program.totalWeeks)
                 : program.schedule.length;
               return (
-                <button
+                <div
                   key={program.id}
+                  className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all flex items-center justify-between cursor-pointer"
                   onClick={() => onOpenProgram(program)}
-                  className="w-full text-left bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-50 rounded-xl">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="p-2.5 bg-indigo-50 rounded-xl flex-shrink-0">
                       <BookOpen className="w-5 h-5 text-indigo-600" />
                     </div>
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm">{program.name}</p>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-800 text-sm truncate">{program.name}</p>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
                         {program.totalWeeks} week{program.totalWeeks !== 1 ? 's' : ''}
                         {' · '}
@@ -79,8 +186,18 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, programs, onSt
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300" />
-                </button>
+                  <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteProgram(program.id); }}
+                      className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                      aria-label={`Delete ${program.name}`}
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <ChevronRight className="w-4 h-4 text-slate-300" />
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -173,6 +290,9 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, programs, onSt
         </div>
       )}
 
+      {/* Workout Calendar */}
+      <WorkoutCalendar history={history} />
+
       {/* Quick Stats Summary */}
       <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm">
         <h4 className="font-bold text-slate-800 mb-4">Quick Stats</h4>
@@ -182,8 +302,14 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, programs, onSt
             <span className="text-2xl font-black text-slate-800">{history.length}</span>
           </div>
           <div className="p-3 bg-blue-50 rounded-lg">
-            <span className="block text-blue-600 text-[10px] font-black uppercase">Consistency</span>
-            <span className="text-2xl font-black text-slate-800">{history.length > 0 ? "75%" : "0%"}</span>
+            <span className="block text-blue-600 text-[10px] font-black uppercase">This Month</span>
+            <span className="text-2xl font-black text-slate-800">
+              {history.filter(s => {
+                const d = new Date(s.date);
+                const n = new Date();
+                return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+              }).length}
+            </span>
           </div>
         </div>
       </div>

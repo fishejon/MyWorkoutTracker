@@ -413,6 +413,7 @@ const App: React.FC = () => {
             programs={programs}
             onStart={handleStartWorkout}
             onDelete={handleDeleteCircuit}
+            onDeleteProgram={handleDeleteProgram}
             onEdit={(circuit) => {
               setEditingCircuit(circuit);
               setView('builder');
@@ -489,6 +490,7 @@ const App: React.FC = () => {
             programs={programs}
             onStart={handleStartWorkout}
             onDelete={handleDeleteCircuit}
+            onDeleteProgram={handleDeleteProgram}
             onEdit={(circuit) => {
               setEditingCircuit(circuit);
               setView('builder');
