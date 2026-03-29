@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Activity, History as HistoryIcon, BarChart3, Dumbbell, Plus } from 'lucide-react';
+import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { AppView, Circuit, WorkoutSession, CustomExercise, Program } from './types';
 import {
@@ -587,51 +587,45 @@ const App: React.FC = () => {
   // Special full-height handling for active workout, builder, upload, and program views
   if (view === 'active' || view === 'builder' || view === 'upload' || view === 'program') {
     return (
-      <div className="h-screen-dynamic w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-slate-50 relative border-x border-slate-200 overflow-hidden">
+      <div className="h-screen-dynamic w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-zinc-50 relative border-x border-zinc-200 overflow-hidden">
         {renderView()}
       </div>
     );
   }
 
   return (
-    <div className="h-screen-dynamic flex flex-col w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-slate-50 relative border-x border-slate-200 overflow-hidden">
+    <div className="h-screen-dynamic flex flex-col w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-zinc-50 relative border-x border-zinc-200 overflow-hidden">
       {/* Header */}
-      <header className="bg-indigo-600 text-white px-4 py-3 sticky top-0 z-10 shadow-lg flex-shrink-0">
+      <header className="bg-zinc-900 text-white px-4 py-3 sticky top-0 z-10 shadow-sm flex-shrink-0">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="p-1.5 bg-white/20 rounded-lg flex-shrink-0">
-              <Dumbbell className="w-6 h-6" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-1.5 bg-white/10 rounded-lg flex-shrink-0">
+              <Dumbbell className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-black tracking-tight italic truncate">MyWorkoutTracker</h1>
+              <h1 className="text-base font-bold tracking-tight truncate">MyWorkoutTracker</h1>
               {user?.email && (
-                <div className="text-[10px] font-black uppercase tracking-widest text-white/70 truncate">
+                <div className="text-[10px] text-white/50 truncate">
                   {user.email}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleLogout}
-              className="px-3 py-1.5 bg-white/15 hover:bg-white/20 rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
-              title="Sign out"
-            >
-              Sign out
-            </button>
-
-            <button onClick={() => setView('stats')} className="p-2 hover:bg-white/10 rounded-full transition-colors active:scale-90" title="Stats">
-              <BarChart3 className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={handleLogout}
+            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-colors"
+            title="Sign out"
+          >
+            Sign out
+          </button>
         </div>
       </header>
 
       {dataError && (
-        <div className="flex-shrink-0 px-4 py-2 bg-amber-100 border-b border-amber-200 text-amber-900 text-sm font-medium flex items-center justify-between gap-2">
+        <div className="flex-shrink-0 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-sm font-medium flex items-center justify-between gap-2">
           <span>{dataError}</span>
-          <button type="button" onClick={() => setDataError(null)} className="text-amber-700 hover:text-amber-900 font-bold" aria-label="Dismiss">×</button>
+          <button type="button" onClick={() => setDataError(null)} className="text-amber-600 hover:text-amber-800 font-bold" aria-label="Dismiss">×</button>
         </div>
       )}
 
@@ -640,35 +634,43 @@ const App: React.FC = () => {
         {renderView()}
       </main>
 
-      {/* Bottom Navigation (Glassmorphic) */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-slate-200/50 px-8 pt-3 pb-[calc(1.5rem+var(--sab))] flex justify-between items-center z-50">
-        <button 
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-zinc-200/60 px-4 pt-3 pb-[calc(1.25rem+var(--sab))] flex justify-between items-center z-50">
+        <button
           onClick={() => setView('dashboard')}
-          className={`flex flex-col items-center gap-1 transition-all ${view === 'dashboard' ? 'text-indigo-600' : 'text-slate-400'}`}
+          className={`flex flex-col items-center gap-1 transition-colors min-w-[48px] ${view === 'dashboard' ? 'text-sky-500' : 'text-zinc-400'}`}
         >
-          <Activity className="w-6 h-6" />
-          <span className="text-[10px] font-black uppercase tracking-widest">Circuits</span>
+          <Home className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Home</span>
         </button>
-        
-        <button 
+
+        <button
           onClick={() => {
             setEditingCircuit(null);
             setView('builder');
           }}
-          className="relative -top-6"
+          className="relative -top-5"
         >
-          <div className="p-4 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-200 ring-8 ring-slate-50 active:scale-90 transition-all">
-            <Plus className="w-7 h-7" />
+          <div className="p-4 bg-zinc-900 text-white rounded-2xl shadow-lg ring-8 ring-zinc-50 active:scale-90 transition-all">
+            <Plus className="w-6 h-6" />
           </div>
-          <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] font-black uppercase tracking-widest text-slate-400">New</span>
+          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-zinc-400">New</span>
         </button>
 
-        <button 
+        <button
           onClick={() => setView('history')}
-          className={`flex flex-col items-center gap-1 transition-all ${view === 'history' ? 'text-indigo-600' : 'text-slate-400'}`}
+          className={`flex flex-col items-center gap-1 transition-colors min-w-[48px] ${view === 'history' ? 'text-sky-500' : 'text-zinc-400'}`}
         >
-          <HistoryIcon className="w-6 h-6" />
-          <span className="text-[10px] font-black uppercase tracking-widest">History</span>
+          <HistoryIcon className="w-5 h-5" />
+          <span className="text-[10px] font-medium">History</span>
+        </button>
+
+        <button
+          onClick={() => setView('stats')}
+          className={`flex flex-col items-center gap-1 transition-colors min-w-[48px] ${view === 'stats' ? 'text-sky-500' : 'text-zinc-400'}`}
+        >
+          <BarChart3 className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Stats</span>
         </button>
       </nav>
     </div>

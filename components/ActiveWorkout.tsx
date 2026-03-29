@@ -99,20 +99,20 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   }));
 
   return (
-    <div className="flex flex-col h-screen-dynamic bg-slate-50 relative overflow-hidden">
+    <div className="flex flex-col h-screen-dynamic bg-zinc-50 relative overflow-hidden">
       {/* Header */}
-      <div className="bg-indigo-600 p-4 pb-6 flex items-center justify-between z-50 text-white shadow-xl shrink-0">
+      <div className="bg-zinc-900 p-4 flex items-center justify-between z-50 text-white shadow-sm shrink-0">
         <button onClick={onCancel} className="p-2 active:scale-90 transition-transform bg-white/10 rounded-full"><ChevronLeft /></button>
         <div className="text-center">
-          <h2 className="font-black tracking-widest leading-none text-[10px] uppercase opacity-70 mb-1">Workout Session</h2>
-          <div className="flex items-center justify-center gap-2 text-xl font-black italic">
-            <Timer className="w-5 h-5 text-indigo-200" />
+          <h2 className="text-xs font-medium text-white/50 mb-0.5">Session</h2>
+          <div className="flex items-center justify-center gap-1.5 text-lg font-bold">
+            <Timer className="w-4 h-4 text-white/40" />
             <span>{formatTime(timer)}</span>
           </div>
         </div>
         <button
           onClick={handleFinish}
-          className="bg-white text-indigo-600 font-black text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-2xl shadow-lg active:scale-95 transition-transform"
+          className="bg-white text-zinc-900 font-semibold text-xs px-4 py-2 rounded-xl active:scale-95 transition-transform"
         >
           End
         </button>
@@ -121,19 +121,19 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8 pb-40">
         {/* Info Row */}
-        <div className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-indigo-50 rounded-2xl">
-              <LayoutGrid className="w-6 h-6 text-indigo-600" />
+        <div className="bg-white p-4 rounded-2xl border border-zinc-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-zinc-100 rounded-xl">
+              <LayoutGrid className="w-5 h-5 text-zinc-600" />
             </div>
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Routine Overview</p>
-              <p className="text-sm font-bold text-slate-800">{circuits.length} Circuits • {logs.length} Exercises</p>
+              <p className="text-xs text-zinc-400 font-medium">Routine</p>
+              <p className="text-sm font-semibold text-zinc-900">{circuits.length} Circuit{circuits.length !== 1 ? 's' : ''} · {logs.length} Exercises</p>
             </div>
           </div>
           <input
             type="date"
-            className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-3 rounded-2xl border border-indigo-100 outline-none"
+            className="text-xs font-medium text-zinc-600 bg-zinc-50 px-3 py-2 rounded-xl border border-zinc-200 outline-none focus:border-sky-400"
             value={sessionDate}
             onChange={(e) => setSessionDate(e.target.value)}
           />
@@ -148,19 +148,19 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
 
           return (
             <div key={circuit.id} className="space-y-3">
-              <div className="flex items-center gap-4 px-2">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">{circuit.name}</h3>
-                <div className="h-[2px] w-full bg-slate-100 rounded-full" />
+              <div className="flex items-center gap-3 px-1">
+                <h3 className="text-xs font-semibold text-zinc-500 whitespace-nowrap">{circuit.name}</h3>
+                <div className="h-px w-full bg-zinc-200" />
               </div>
 
-              <div className="bg-white rounded-[2rem] shadow-md border border-slate-100 overflow-hidden">
+              <div className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
                       {/* Primary header: Exercise | Set 1 | Set 2 | … */}
-                      <tr className="bg-slate-50/60 border-b border-slate-100">
+                      <tr className="bg-zinc-50 border-b border-zinc-100">
                         <th
-                          className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest"
+                          className="text-left px-4 py-3 text-[9px] font-medium text-zinc-400 uppercase tracking-wide"
                           style={{ minWidth: '130px' }}
                         >
                           Exercise
@@ -169,24 +169,23 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                           <th
                             key={si}
                             colSpan={hasWeightEx ? 2 : 1}
-                            className="px-2 py-3 text-[9px] font-black text-indigo-400 uppercase tracking-widest text-center border-l border-slate-100"
+                            className="px-2 py-2.5 text-[9px] font-medium text-sky-400 uppercase tracking-wide text-center border-l border-zinc-100"
                             style={{ minWidth: hasWeightEx ? '84px' : '56px' }}
                           >
                             Set {si + 1}
                           </th>
                         ))}
                       </tr>
-                      {/* Sub-header showing LBS / REPS labels when circuit has weight exercises */}
                       {hasWeightEx && (
-                        <tr className="border-b border-slate-100/50 bg-slate-50/20">
+                        <tr className="border-b border-zinc-100 bg-zinc-50/50">
                           <td className="px-4 py-1" />
                           {setIndices.map(si => (
                             <React.Fragment key={si}>
-                              <td className="py-1 text-center border-l border-slate-100">
-                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-wider">lbs</span>
+                              <td className="py-1 text-center border-l border-zinc-100">
+                                <span className="text-[8px] font-medium text-zinc-300">lbs</span>
                               </td>
                               <td className="py-1 text-center">
-                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-wider">reps</span>
+                                <span className="text-[8px] font-medium text-zinc-300">reps</span>
                               </td>
                             </React.Fragment>
                           ))}
@@ -198,9 +197,9 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                         <tr key={`${log.exerciseId}-${logIdx}`}>
                           {/* Exercise name + type badge */}
                           <td className="px-4 py-3">
-                            <p className="font-bold text-slate-800 text-sm leading-tight">{log.exerciseName}</p>
-                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-wider ${
-                              log.type === 'weight' ? 'bg-indigo-100 text-indigo-600' :
+                            <p className="font-semibold text-zinc-900 text-sm leading-tight">{log.exerciseName}</p>
+                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[7px] font-medium tracking-wide ${
+                              log.type === 'weight' ? 'bg-zinc-100 text-sky-500' :
                               log.type === 'reps'   ? 'bg-emerald-100 text-emerald-600' :
                                                      'bg-amber-100 text-amber-600'
                             }`}>
@@ -241,7 +240,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                                   <td className="px-1 py-3 border-l border-slate-100">
                                     <input
                                       type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*"
-                                      className="w-10 h-10 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-black text-slate-900 placeholder:text-slate-300 outline-none focus:border-indigo-400 focus:bg-white transition-all text-center block mx-auto"
+                          className="w-10 h-10 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
                                       placeholder={lastSet?.weight && lastSet.weight > 0 ? String(lastSet.weight) : '·'}
                                       value={set.weight === 0 ? '' : set.weight}
                                       onChange={(e) => updateLog(logIdx, si, 'weight', e.target.value)}
@@ -250,7 +249,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                                   <td className="px-1 py-3">
                                     <input
                                       type="text" inputMode="numeric" pattern="[0-9]*"
-                                      className="w-10 h-10 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-black text-slate-900 placeholder:text-slate-300 outline-none focus:border-indigo-400 focus:bg-white transition-all text-center block mx-auto"
+                          className="w-10 h-10 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
                                       placeholder={lastSet?.value && lastSet.value > 0 ? String(lastSet.value) : '·'}
                                       value={set.value === 0 ? '' : set.value}
                                       onChange={(e) => updateLog(logIdx, si, 'value', e.target.value)}
@@ -265,7 +264,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                               <td key={si} colSpan={hasWeightEx ? 2 : 1} className="px-2 py-3 border-l border-slate-100">
                                 <input
                                   type="text" inputMode="numeric" pattern="[0-9]*"
-                                  className={`h-10 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-black text-slate-900 placeholder:text-slate-300 outline-none transition-all text-center block mx-auto ${
+                                  className={`h-10 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none transition-all text-center block mx-auto ${
                                     log.type === 'duration'
                                       ? 'w-14 focus:border-amber-400 focus:bg-white'
                                       : 'w-12 focus:border-emerald-400 focus:bg-white'
@@ -292,7 +291,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       <div className="absolute bottom-0 left-0 right-0 p-6 pb-[calc(1.5rem+var(--sab))] glass-nav border-t border-slate-200/50 z-50">
         <button
           onClick={handleFinish}
-          className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black shadow-2xl shadow-indigo-300 flex items-center justify-center gap-4 active:scale-[0.98] transition-all tracking-widest uppercase text-sm"
+        className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-semibold shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all text-sm"
         >
           <CheckCircle2 className="w-7 h-7" /> Finish Routine
         </button>
