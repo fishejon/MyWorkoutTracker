@@ -1,18 +1,21 @@
 
 import React, { useState } from 'react';
-import { Circuit, WorkoutSession } from '../types';
-import { Play, Trash2, PlusCircle, Pencil, Check } from 'lucide-react';
+import { Circuit, WorkoutSession, Program } from '../types';
+import { Play, Trash2, PlusCircle, Pencil, Check, Upload, BookOpen, ChevronRight } from 'lucide-react';
 
 interface DashboardProps {
   circuits: Circuit[];
   history: WorkoutSession[];
+  programs: Program[];
   onStart: (selectedCircuits: Circuit[]) => void;
   onDelete: (id: string) => void;
   onEdit: (circuit: Circuit) => void;
   onNew: () => void;
+  onImportCSV: () => void;
+  onOpenProgram: (program: Program) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ circuits, history, onStart, onDelete, onEdit, onNew }) => {
+const Dashboard: React.FC<DashboardProps> = ({ circuits, history, programs, onStart, onDelete, onEdit, onNew, onImportCSV, onOpenProgram }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const toggleSelection = (id: string) => {
@@ -29,6 +32,62 @@ const Dashboard: React.FC<DashboardProps> = ({ circuits, history, onStart, onDel
 
   return (
     <div className="p-5 space-y-6">
+      {/* Programs Section */}
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-bold text-slate-800">Programs</h3>
+          <button
+            onClick={onImportCSV}
+            className="text-indigo-600 text-sm font-semibold flex items-center gap-1"
+          >
+            <Upload className="w-4 h-4" />
+            Import CSV
+          </button>
+        </div>
+
+        {programs.length === 0 ? (
+          <button
+            onClick={onImportCSV}
+            className="w-full text-center py-8 bg-white rounded-xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-indigo-300 hover:bg-indigo-50/20 transition-all"
+          >
+            <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm font-medium">Import a CSV to create a program</p>
+            <p className="text-xs mt-1 opacity-60">Single day or multi-week plans</p>
+          </button>
+        ) : (
+          <div className="grid gap-3">
+            {programs.map(program => {
+              const workoutsPerWeek = program.totalWeeks > 0
+                ? Math.round(program.schedule.length / program.totalWeeks)
+                : program.schedule.length;
+              return (
+                <button
+                  key={program.id}
+                  onClick={() => onOpenProgram(program)}
+                  className="w-full text-left bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:border-indigo-200 hover:shadow-md transition-all flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-indigo-50 rounded-xl">
+                      <BookOpen className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{program.name}</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                        {program.totalWeeks} week{program.totalWeeks !== 1 ? 's' : ''}
+                        {' · '}
+                        {workoutsPerWeek} day{workoutsPerWeek !== 1 ? 's' : ''}/week
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Circuits Section */}
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-slate-800">My Circuits</h3>
         <button onClick={onNew} className="text-indigo-600 text-sm font-semibold flex items-center gap-1">

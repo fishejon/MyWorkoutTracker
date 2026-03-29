@@ -1,5 +1,5 @@
 
-import { Circuit, WorkoutSession, ExerciseLog } from '../types';
+import { Circuit, WorkoutSession, ExerciseLog, Program } from '../types';
 // Fix: STORAGE_KEYS is exported from constants.ts, not types.ts
 import { STORAGE_KEYS } from '../constants';
 
@@ -15,6 +15,7 @@ export const clearUserStorage = () => {
   try {
     localStorage.removeItem(nsKey(STORAGE_KEYS.CIRCUITS));
     localStorage.removeItem(nsKey(STORAGE_KEYS.HISTORY));
+    localStorage.removeItem(nsKey(STORAGE_KEYS.PROGRAMS));
   } catch {
     // ignore
   }
@@ -41,6 +42,19 @@ export const saveSession = (session: WorkoutSession) => {
 export const getHistory = (): WorkoutSession[] => {
   try {
     const data = localStorage.getItem(nsKey(STORAGE_KEYS.HISTORY));
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const savePrograms = (programs: Program[]) => {
+  localStorage.setItem(nsKey(STORAGE_KEYS.PROGRAMS), JSON.stringify(programs));
+};
+
+export const getPrograms = (): Program[] => {
+  try {
+    const data = localStorage.getItem(nsKey(STORAGE_KEYS.PROGRAMS));
     return data ? JSON.parse(data) : [];
   } catch {
     return [];

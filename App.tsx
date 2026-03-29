@@ -2,21 +2,37 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, History as HistoryIcon, BarChart3, Dumbbell, Plus } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
-import { AppView, Circuit, WorkoutSession, CustomExercise } from './types';
+import { AppView, Circuit, WorkoutSession, CustomExercise, Program } from './types';
 import {
   getCircuits,
   getHistory,
   saveCircuits,
   saveSession,
   setStorageNamespace,
+  getPrograms,
+  savePrograms,
 } from './services/storage';
 import Dashboard from './components/Dashboard';
 import CircuitBuilder from './components/CircuitBuilder';
 import ActiveWorkout from './components/ActiveWorkout';
 import HistoryView from './components/HistoryView';
 import StatsView from './components/StatsView';
+import ProgramUpload from './components/ProgramUpload';
+import ProgramView from './components/ProgramView';
 
 const ID_TOKEN_STORAGE_KEY = 'mwt_google_id_token';
+
+/** Decode a JWT and check whether its `exp` claim is in the past. */
+function isTokenExpired(token: string): boolean {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64)) as { exp?: number };
+    if (!payload.exp) return false;
+    return payload.exp < Math.floor(Date.now() / 1000);
+  } catch {
+    return false; // unparseable — treat as valid and let the server reject it
+  }
+}
 
 type AuthedUser = {
   sub: string;
@@ -34,6 +50,8 @@ const App: React.FC = () => {
   const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
   const [activeCircuits, setActiveCircuits] = useState<Circuit[]>([]);
   const [editingCircuit, setEditingCircuit] = useState<Circuit | null>(null);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [viewingProgram, setViewingProgram] = useState<Program | null>(null);
   const [idToken, setIdToken] = useState<string | null>(() => {
     try {
       return sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
@@ -45,6 +63,8 @@ const App: React.FC = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const [user, setUser] = useState<AuthedUser | null>(null);
+  /** Session that finished while the token was expired; synced on next successful auth. */
+  const [pendingSession, setPendingSession] = useState<WorkoutSession | null>(null);
 
   const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -57,8 +77,10 @@ const App: React.FC = () => {
     setCircuits([]);
     setHistory([]);
     setCustomExercises([]);
+    setPrograms([]);
     setDataError(null);
     setActiveCircuits([]);
+    setViewingProgram(null);
     setView('dashboard');
 
     try {
@@ -145,16 +167,25 @@ const App: React.FC = () => {
     nextCircuits: Circuit[],
     nextHistory: WorkoutSession[],
     nextCustomExercises?: CustomExercise[],
+    nextPrograms?: Program[],
   ) => {
     if (authStatus !== 'authed' || !idToken) return;
 
     try {
-      const body: { circuits: Circuit[]; history: WorkoutSession[]; customExercises?: CustomExercise[] } = {
+      const body: {
+        circuits: Circuit[];
+        history: WorkoutSession[];
+        customExercises?: CustomExercise[];
+        programs?: Program[];
+      } = {
         circuits: nextCircuits,
         history: nextHistory,
       };
       if (nextCustomExercises !== undefined) {
         body.customExercises = nextCustomExercises;
+      }
+      if (nextPrograms !== undefined) {
+        body.programs = nextPrograms;
       }
       const resp = await fetch('/api/data/save', {
         method: 'POST',
@@ -209,29 +240,43 @@ const App: React.FC = () => {
           circuits: Circuit[];
           history: WorkoutSession[];
           customExercises?: CustomExercise[];
+          programs?: Program[];
         };
 
         const serverCircuits = Array.isArray(data.circuits) ? data.circuits : [];
         const serverHistory = Array.isArray(data.history) ? data.history : [];
         const serverCustomExercises = Array.isArray(data.customExercises) ? data.customExercises : [];
+        const serverPrograms = Array.isArray(data.programs) ? data.programs : [];
 
-        // If server has nothing yet but this device has local data, push local to server.
-        const shouldUploadLocal =
-          serverCircuits.length === 0 && serverHistory.length === 0 && (localCircuits.length > 0 || localHistory.length > 0);
+        // Prefer server circuits; fall back to local if server has none.
+        const nextCircuits = serverCircuits.length > 0 ? serverCircuits : localCircuits;
 
-        const nextCircuits = shouldUploadLocal ? localCircuits : serverCircuits;
-        const nextHistory = shouldUploadLocal ? localHistory : serverHistory;
-        const nextCustomExercises = shouldUploadLocal ? [] : serverCustomExercises;
+        // Merge: find local sessions not present on server (e.g. saved during an expired-token finish)
+        // and prepend them so they are not lost. Then push the merged set to the server.
+        const serverSessionIds = new Set(serverHistory.map((s: WorkoutSession) => s.id));
+        const missingSessions = localHistory.filter((s: WorkoutSession) => !serverSessionIds.has(s.id));
+        const nextHistory = missingSessions.length > 0
+          ? [...missingSessions, ...serverHistory]
+          : serverHistory;
+        const nextCustomExercises = serverCustomExercises.length > 0 ? serverCustomExercises : [];
+        const localPrograms = getPrograms();
+        const nextPrograms = serverPrograms.length > 0 ? serverPrograms : localPrograms;
 
         if (!cancelled) {
           setCircuits(nextCircuits);
           setHistory(nextHistory);
           setCustomExercises(nextCustomExercises);
+          setPrograms(nextPrograms);
           setView('dashboard');
         }
 
-        if (shouldUploadLocal) {
-          await persistUserData(localCircuits, localHistory, []);
+        // Upload if server was empty OR if we merged local-only sessions
+        const needsUpload =
+          (serverCircuits.length === 0 && localCircuits.length > 0) ||
+          missingSessions.length > 0 ||
+          (serverPrograms.length === 0 && localPrograms.length > 0);
+        if (needsUpload) {
+          await persistUserData(nextCircuits, nextHistory, nextCustomExercises, nextPrograms);
         }
       } catch (e) {
         console.warn('Failed to sync user data, falling back to local:', e);
@@ -249,6 +294,14 @@ const App: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authStatus, idToken]);
+
+  // Once re-authentication completes, clear the pending session indicator.
+  // The on-load merge logic above already handles syncing the localStorage session to the server.
+  useEffect(() => {
+    if (authStatus === 'authed' && pendingSession) {
+      setPendingSession(null);
+    }
+  }, [authStatus, pendingSession]);
 
   const handleCreateCircuit = (newCircuit: Circuit) => {
     const updated = [...circuits, newCircuit];
@@ -293,8 +346,46 @@ const App: React.FC = () => {
     });
   };
 
+  const handleImportCircuits = (newCircuits: Circuit[]) => {
+    const updated = [...circuits, ...newCircuits];
+    setCircuits(updated);
+    saveCircuits(updated);
+    void persistUserData(updated, history, customExercises);
+    setView('dashboard');
+  };
+
+  const handleImportProgram = (program: Program) => {
+    const updated = [...programs, program];
+    setPrograms(updated);
+    savePrograms(updated);
+    void persistUserData(circuits, history, customExercises, updated);
+    setView('dashboard');
+  };
+
+  const handleDeleteProgram = (id: string) => {
+    const updated = programs.filter(p => p.id !== id);
+    setPrograms(updated);
+    savePrograms(updated);
+    void persistUserData(circuits, history, customExercises, updated);
+    setViewingProgram(null);
+    setView('dashboard');
+  };
+
   const handleFinishWorkout = (session: WorkoutSession) => {
+    // Always persist locally first — this guarantees the session survives any network/auth failure.
     saveSession(session);
+
+    // If the token is missing or expired, skip the server call and store as pending.
+    // The improved on-load merge logic will sync it automatically on next login.
+    if (!idToken || isTokenExpired(idToken)) {
+      setPendingSession(session);
+      setHistory(prev => [session, ...prev]);
+      setActiveCircuits([]);
+      setView('history');
+      setDataError('Session expired — workout saved locally and will sync on next sign-in.');
+      return;
+    }
+
     setHistory(prev => {
       const next = [session, ...prev];
       void persistUserData(circuits, next, customExercises);
@@ -316,10 +407,11 @@ const App: React.FC = () => {
     switch (view) {
       case 'dashboard':
         return (
-          <Dashboard 
-            circuits={circuits} 
+          <Dashboard
+            circuits={circuits}
             history={history}
-            onStart={handleStartWorkout} 
+            programs={programs}
+            onStart={handleStartWorkout}
             onDelete={handleDeleteCircuit}
             onEdit={(circuit) => {
               setEditingCircuit(circuit);
@@ -328,6 +420,11 @@ const App: React.FC = () => {
             onNew={() => {
               setEditingCircuit(null);
               setView('builder');
+            }}
+            onImportCSV={() => setView('upload')}
+            onOpenProgram={(program) => {
+              setViewingProgram(program);
+              setView('program');
             }}
           />
         );
@@ -347,25 +444,49 @@ const App: React.FC = () => {
         );
       case 'active':
         return activeCircuits.length > 0 ? (
-          <ActiveWorkout 
-            circuits={activeCircuits} 
+          <ActiveWorkout
+            circuits={activeCircuits}
             history={history}
-            onFinish={handleFinishWorkout} 
+            onFinish={handleFinishWorkout}
             onCancel={() => {
               setActiveCircuits([]);
-              setView('dashboard');
-            }} 
+              setView(viewingProgram ? 'program' : 'dashboard');
+            }}
           />
         ) : null;
       case 'history':
         return <HistoryView history={history} />;
       case 'stats':
         return <StatsView history={history} />;
+      case 'upload':
+        return (
+          <ProgramUpload
+            onImportCircuits={handleImportCircuits}
+            onImportProgram={handleImportProgram}
+            onCancel={() => setView('dashboard')}
+          />
+        );
+      case 'program':
+        return viewingProgram ? (
+          <ProgramView
+            program={viewingProgram}
+            onStartDay={(daycircuits) => {
+              setActiveCircuits(daycircuits);
+              setView('active');
+            }}
+            onDelete={handleDeleteProgram}
+            onBack={() => {
+              setViewingProgram(null);
+              setView('dashboard');
+            }}
+          />
+        ) : null;
       default:
         return (
           <Dashboard
             circuits={circuits}
             history={history}
+            programs={programs}
             onStart={handleStartWorkout}
             onDelete={handleDeleteCircuit}
             onEdit={(circuit) => {
@@ -375,6 +496,11 @@ const App: React.FC = () => {
             onNew={() => {
               setEditingCircuit(null);
               setView('builder');
+            }}
+            onImportCSV={() => setView('upload')}
+            onOpenProgram={(program) => {
+              setViewingProgram(program);
+              setView('program');
             }}
           />
         );
@@ -456,8 +582,8 @@ const App: React.FC = () => {
     );
   }
 
-  // Special full-height handling for active workout and builder
-  if (view === 'active' || view === 'builder') {
+  // Special full-height handling for active workout, builder, upload, and program views
+  if (view === 'active' || view === 'builder' || view === 'upload' || view === 'program') {
     return (
       <div className="h-screen-dynamic w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-slate-50 relative border-x border-slate-200 overflow-hidden">
         {renderView()}

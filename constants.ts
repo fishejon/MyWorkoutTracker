@@ -123,4 +123,5 @@ export const STORAGE_KEYS = {
   CIRCUITS: 'myworkouttracker_circuits',
   HISTORY: 'myworkouttracker_history',
   SETTINGS: 'myworkouttracker_settings',
+  PROGRAMS: 'myworkouttracker_programs',
 };

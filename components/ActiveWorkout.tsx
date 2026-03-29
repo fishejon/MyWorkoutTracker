@@ -1,152 +1,14 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Circuit, WorkoutSession, ExerciseLog } from '../types';
-import { CheckCircle2, ChevronLeft, Timer, Weight, Repeat, Zap, LayoutGrid, Play, Square, Bell, Plus, Minus } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Timer, LayoutGrid } from 'lucide-react';
 import { getHistory, getLastWorkoutDataForExercise } from '../services/storage';
-
-declare global {
-  interface Window {
-    webkitAudioContext?: typeof AudioContext;
-  }
-}
 
 interface ActiveWorkoutProps {
   circuits: Circuit[];
   onFinish: (session: WorkoutSession) => void;
   onCancel: () => void;
-  history?: WorkoutSession[]; // Optional workout history for showing last workout data
+  history?: WorkoutSession[];
 }
-
-const TIMER_PRESETS = [15, 30, 45, 60, 90];
-
-const playAlarmSound = () => {
-  try {
-    const ContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!ContextClass) return;
-    const context = new ContextClass();
-    const oscillator = context.createOscillator();
-    const gainNode = context.createGain();
-
-    oscillator.connect(gainNode);
-    gainNode.connect(context.destination);
-
-    oscillator.type = 'square';
-    oscillator.frequency.setValueAtTime(880, context.currentTime);
-    gainNode.gain.setValueAtTime(0.2, context.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, context.currentTime + 1.5);
-
-    oscillator.start(context.currentTime);
-    oscillator.stop(context.currentTime + 1.5);
-  } catch {
-    // Audio Context may be blocked by browser policy; fail silently
-  }
-};
-
-const SetTimer: React.FC<{
-  initialSeconds: number;
-  onComplete: () => void;
-  onUpdateValue: (val: number) => void;
-}> = ({ initialSeconds, onComplete, onUpdateValue }) => {
-  const [timeLeft, setTimeLeft] = useState(initialSeconds);
-  const [isRunning, setIsRunning] = useState(false);
-  const timerRef = useRef<number | null>(null);
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
-
-  // Sync display when preset changes and timer is not running
-  useEffect(() => {
-    if (!isRunning) setTimeLeft(initialSeconds);
-  }, [initialSeconds, isRunning]);
-
-  // Single interval when running; ref for onComplete avoids effect churn
-  useEffect(() => {
-    if (!isRunning) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      return;
-    }
-    timerRef.current = window.setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          onCompleteRef.current?.();
-          setIsRunning(false);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [isRunning]); // eslint-disable-line react-hooks/exhaustive-deps -- timeLeft intentionally excluded to avoid recreating interval every second
-
-  const toggleTimer = () => {
-    if (timeLeft <= 0) setTimeLeft(initialSeconds);
-    setIsRunning(!isRunning);
-  };
-
-  const adjustTimer = (amount: number) => {
-    const newValue = Math.max(0, initialSeconds + amount);
-    onUpdateValue(newValue);
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-1">
-        <button 
-          onClick={toggleTimer}
-          disabled={initialSeconds <= 0 && !isRunning}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 ${
-            isRunning 
-              ? 'bg-red-500 text-white animate-pulse' 
-              : initialSeconds > 0 
-                ? 'bg-indigo-600 text-white' 
-                : 'bg-slate-100 text-slate-400'
-          }`}
-        >
-          {isRunning ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-          {isRunning ? `${timeLeft}s` : (timeLeft > 0 ? 'START' : 'SET TIMER')}
-        </button>
-      </div>
-      
-      {!isRunning && (
-        <div className="flex items-center justify-between gap-1">
-          <button 
-            onClick={() => adjustTimer(-5)}
-            className="p-2 bg-slate-100 text-slate-500 rounded-xl active:bg-slate-200 transition-colors"
-          >
-            <Minus className="w-3 h-3" />
-          </button>
-          <div className="flex gap-1 overflow-x-auto no-scrollbar">
-            {TIMER_PRESETS.map(preset => (
-              <button
-                key={preset}
-                onClick={() => onUpdateValue(preset)}
-                className={`px-2 py-1 rounded-lg text-[8px] font-black border transition-all ${
-                  initialSeconds === preset 
-                    ? 'bg-indigo-50 border-indigo-200 text-indigo-600' 
-                    : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
-                }`}
-              >
-                {preset}s
-              </button>
-            ))}
-          </div>
-          <button 
-            onClick={() => adjustTimer(5)}
-            className="p-2 bg-slate-100 text-slate-500 rounded-xl active:bg-slate-200 transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCancel, history }) => {
   // Use provided history or fetch from storage if not provided
@@ -237,7 +99,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
 
   return (
     <div className="flex flex-col h-screen-dynamic bg-slate-50 relative overflow-hidden">
-      {/* Header (Fixed) */}
+      {/* Header */}
       <div className="bg-indigo-600 p-4 pb-6 flex items-center justify-between z-50 text-white shadow-xl shrink-0">
         <button onClick={onCancel} className="p-2 active:scale-90 transition-transform bg-white/10 rounded-full"><ChevronLeft /></button>
         <div className="text-center">
@@ -247,17 +109,17 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
             <span>{formatTime(timer)}</span>
           </div>
         </div>
-        <button 
-          onClick={handleFinish} 
+        <button
+          onClick={handleFinish}
           className="bg-white text-indigo-600 font-black text-[10px] uppercase tracking-widest px-4 py-2.5 rounded-2xl shadow-lg active:scale-95 transition-transform"
         >
           End
         </button>
       </div>
 
-      {/* Main Content Area (Scrollable) */}
+      {/* Main Content */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8 pb-40">
-        {/* Top Info Section */}
+        {/* Info Row */}
         <div className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-indigo-50 rounded-2xl">
@@ -268,128 +130,167 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
               <p className="text-sm font-bold text-slate-800">{circuits.length} Circuits • {logs.length} Exercises</p>
             </div>
           </div>
-          <input 
-            type="date" 
+          <input
+            type="date"
             className="text-xs font-bold text-indigo-600 bg-indigo-50 px-4 py-3 rounded-2xl border border-indigo-100 outline-none"
             value={sessionDate}
             onChange={(e) => setSessionDate(e.target.value)}
           />
         </div>
 
-        {groupedLogs.map(({ circuit, logsWithIndices }) => (
-          <div key={circuit.id} className="space-y-5">
-            <div className="flex items-center gap-4 px-2">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">{circuit.name}</h3>
-              <div className="h-[2px] w-full bg-slate-100 rounded-full"></div>
-            </div>
-            
-            {logsWithIndices.map(({ log, index: logIdx }) => (
-              <div key={`${log.exerciseId}-${logIdx}`} className="bg-white rounded-[2.5rem] shadow-md border border-slate-100 overflow-hidden group">
-                <div className="bg-slate-50/40 px-6 py-5 flex justify-between items-center border-b border-slate-100/50">
-                  <div className="flex items-center gap-4">
-                    <div className="w-2 h-8 bg-indigo-600 rounded-full shadow-lg shadow-indigo-100"></div>
-                    <h4 className="font-black text-slate-800 text-lg leading-tight">{log.exerciseName}</h4>
-                  </div>
-                  <div className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-sm">
-                    <Zap className="w-3.5 h-3.5 fill-current" />
-                    {log.type}
-                  </div>
-                </div>
-                
-                <div className="p-4">
-                  <table className="w-full border-separate border-spacing-y-2">
+        {/* Circuit matrices */}
+        {groupedLogs.map(({ circuit, logsWithIndices }) => {
+          const maxSets = Math.max(...logsWithIndices.map(({ log }) => log.sets.length), 1);
+          const setIndices = Array.from({ length: maxSets }, (_, i) => i);
+          // When any exercise in the circuit tracks weight, use 2-column set cells (lbs + reps)
+          const hasWeightEx = logsWithIndices.some(({ log }) => log.type === 'weight');
+
+          return (
+            <div key={circuit.id} className="space-y-3">
+              <div className="flex items-center gap-4 px-2">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] whitespace-nowrap">{circuit.name}</h3>
+                <div className="h-[2px] w-full bg-slate-100 rounded-full" />
+              </div>
+
+              <div className="bg-white rounded-[2rem] shadow-md border border-slate-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
                     <thead>
-                      <tr>
-                        <th className="px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">Set</th>
-                        {log.type === 'weight' && <th className="px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">LBS</th>}
-                        <th className="px-2 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">
-                          {log.type === 'duration' ? 'SECS' : 'REPS'}
+                      {/* Primary header: Exercise | Set 1 | Set 2 | … */}
+                      <tr className="bg-slate-50/60 border-b border-slate-100">
+                        <th
+                          className="text-left px-4 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest"
+                          style={{ minWidth: '130px' }}
+                        >
+                          Exercise
                         </th>
-                        {log.type === 'duration' && <th className="w-32"></th>}
+                        {setIndices.map(si => (
+                          <th
+                            key={si}
+                            colSpan={hasWeightEx ? 2 : 1}
+                            className="px-2 py-3 text-[9px] font-black text-indigo-400 uppercase tracking-widest text-center border-l border-slate-100"
+                            style={{ minWidth: hasWeightEx ? '84px' : '56px' }}
+                          >
+                            Set {si + 1}
+                          </th>
+                        ))}
                       </tr>
+                      {/* Sub-header showing LBS / REPS labels when circuit has weight exercises */}
+                      {hasWeightEx && (
+                        <tr className="border-b border-slate-100/50 bg-slate-50/20">
+                          <td className="px-4 py-1" />
+                          {setIndices.map(si => (
+                            <React.Fragment key={si}>
+                              <td className="py-1 text-center border-l border-slate-100">
+                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-wider">lbs</span>
+                              </td>
+                              <td className="py-1 text-center">
+                                <span className="text-[8px] font-black text-slate-300 uppercase tracking-wider">reps</span>
+                              </td>
+                            </React.Fragment>
+                          ))}
+                        </tr>
+                      )}
                     </thead>
-                    <tbody>
-                      {log.sets.map((set, setIdx) => {
-                        // Get last workout data for this set if available
-                        const lastSet = log.lastWorkoutSets?.[setIdx];
-                        const hasLastData = lastSet && (lastSet.value > 0 || (lastSet.weight && lastSet.weight > 0));
-                        
-                        // Format last workout display text
-                        const formatLastWorkout = () => {
-                          if (!hasLastData) return null;
-                          if (log.type === 'weight' && lastSet.weight) {
-                            return `Last: ${lastSet.weight} lbs × ${lastSet.value} reps`;
-                          } else if (log.type === 'reps') {
-                            return `Last: ${lastSet.value} reps`;
-                          } else if (log.type === 'duration') {
-                            return `Last: ${lastSet.value}s`;
-                          }
-                          return null;
-                        };
-                        
-                        const lastWorkoutText = formatLastWorkout();
-                        const colSpan = log.type === 'duration' ? 4 : (log.type === 'weight' ? 3 : 2);
-                        
-                        return (
-                          <React.Fragment key={setIdx}>
-                            <tr>
-                              <td className="text-center font-black text-slate-200 text-xl">{setIdx + 1}</td>
-                              {log.type === 'weight' && (
-                                <td className="px-1">
-                                  <input 
-                                    type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*"
-                                    className="w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white transition-all text-center"
-                                    placeholder={lastSet?.weight != null ? String(lastSet.weight) : '0'}
-                                    value={set.weight === 0 ? '' : set.weight}
-                                    onChange={(e) => updateLog(logIdx, setIdx, 'weight', e.target.value)}
-                                  />
+                    <tbody className="divide-y divide-slate-50">
+                      {logsWithIndices.map(({ log, index: logIdx }) => (
+                        <tr key={`${log.exerciseId}-${logIdx}`}>
+                          {/* Exercise name + type badge */}
+                          <td className="px-4 py-3">
+                            <p className="font-bold text-slate-800 text-sm leading-tight">{log.exerciseName}</p>
+                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-wider ${
+                              log.type === 'weight' ? 'bg-indigo-100 text-indigo-600' :
+                              log.type === 'reps'   ? 'bg-emerald-100 text-emerald-600' :
+                                                     'bg-amber-100 text-amber-600'
+                            }`}>
+                              {log.type === 'duration' ? 'secs' : log.type}
+                            </span>
+                          </td>
+
+                          {/* Set cells */}
+                          {setIndices.map(si => {
+                            const set = log.sets[si];
+                            const lastSet = log.lastWorkoutSets?.[si];
+
+                            // Exercise has fewer sets than the circuit max — render empty placeholder(s)
+                            if (!set) {
+                              if (log.type === 'weight') {
+                                return (
+                                  <React.Fragment key={si}>
+                                    <td className="px-1 py-3 border-l border-slate-100">
+                                      <div className="w-10 h-10 bg-slate-50 rounded-xl border border-dashed border-slate-200 opacity-30 mx-auto" />
+                                    </td>
+                                    <td className="px-1 py-3">
+                                      <div className="w-10 h-10 bg-slate-50 rounded-xl border border-dashed border-slate-200 opacity-30 mx-auto" />
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              }
+                              return (
+                                <td key={si} colSpan={hasWeightEx ? 2 : 1} className="px-2 py-3 border-l border-slate-100">
+                                  <div className="h-10 w-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 opacity-30 mx-auto" />
                                 </td>
-                              )}
-                              <td className="px-1">
-                                <input 
+                              );
+                            }
+
+                            // Weight exercise: two side-by-side inputs (lbs | reps)
+                            if (log.type === 'weight') {
+                              return (
+                                <React.Fragment key={si}>
+                                  <td className="px-1 py-3 border-l border-slate-100">
+                                    <input
+                                      type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*"
+                                      className="w-10 h-10 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-black text-slate-900 placeholder:text-slate-300 outline-none focus:border-indigo-400 focus:bg-white transition-all text-center block mx-auto"
+                                      placeholder={lastSet?.weight && lastSet.weight > 0 ? String(lastSet.weight) : '·'}
+                                      value={set.weight === 0 ? '' : set.weight}
+                                      onChange={(e) => updateLog(logIdx, si, 'weight', e.target.value)}
+                                    />
+                                  </td>
+                                  <td className="px-1 py-3">
+                                    <input
+                                      type="text" inputMode="numeric" pattern="[0-9]*"
+                                      className="w-10 h-10 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-black text-slate-900 placeholder:text-slate-300 outline-none focus:border-indigo-400 focus:bg-white transition-all text-center block mx-auto"
+                                      placeholder={lastSet?.value && lastSet.value > 0 ? String(lastSet.value) : '·'}
+                                      value={set.value === 0 ? '' : set.value}
+                                      onChange={(e) => updateLog(logIdx, si, 'value', e.target.value)}
+                                    />
+                                  </td>
+                                </React.Fragment>
+                              );
+                            }
+
+                            // Reps or duration — single input, spans 2 cols when circuit has weight exercises
+                            return (
+                              <td key={si} colSpan={hasWeightEx ? 2 : 1} className="px-2 py-3 border-l border-slate-100">
+                                <input
                                   type="text" inputMode="numeric" pattern="[0-9]*"
-                                  className={`w-full h-14 bg-slate-50 border-2 border-slate-100 rounded-2xl text-xl font-black text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white transition-all text-center ${log.type === 'duration' ? 'focus:border-amber-500' : 'focus:border-emerald-500'}`}
-                                  placeholder={lastSet?.value != null ? String(lastSet.value) : '0'}
+                                  className={`h-10 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-black text-slate-900 placeholder:text-slate-300 outline-none transition-all text-center block mx-auto ${
+                                    log.type === 'duration'
+                                      ? 'w-14 focus:border-amber-400 focus:bg-white'
+                                      : 'w-12 focus:border-emerald-400 focus:bg-white'
+                                  }`}
+                                  placeholder={lastSet?.value && lastSet.value > 0 ? String(lastSet.value) : '·'}
                                   value={set.value === 0 ? '' : set.value}
-                                  onChange={(e) => updateLog(logIdx, setIdx, 'value', e.target.value)}
+                                  onChange={(e) => updateLog(logIdx, si, 'value', e.target.value)}
                                 />
                               </td>
-                              {log.type === 'duration' && (
-                                <td className="px-1 align-middle">
-                                  <SetTimer 
-                                    initialSeconds={set.value} 
-                                    onComplete={() => playAlarmSound()}
-                                    onUpdateValue={(newVal) => updateLog(logIdx, setIdx, 'value', newVal)}
-                                  />
-                                </td>
-                              )}
-                            </tr>
-                            {/* Show "Last: …" row only for duration (timer has no placeholder); weight/reps use input placeholders */}
-                            {log.type === 'duration' && lastWorkoutText && (
-                              <tr>
-                                <td colSpan={colSpan} className="px-2 pb-2">
-                                  <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider text-center">
-                                    {lastWorkoutText}
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
+                            );
+                          })}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
-            ))}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Action Footer (Sticky) */}
+      {/* Action Footer */}
       <div className="absolute bottom-0 left-0 right-0 p-6 pb-[calc(1.5rem+var(--sab))] glass-nav border-t border-slate-200/50 z-50">
-        <button 
-          onClick={handleFinish} 
+        <button
+          onClick={handleFinish}
           className="w-full py-5 bg-indigo-600 text-white rounded-[2rem] font-black shadow-2xl shadow-indigo-300 flex items-center justify-center gap-4 active:scale-[0.98] transition-all tracking-widest uppercase text-sm"
         >
           <CheckCircle2 className="w-7 h-7" /> Finish Routine

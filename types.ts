@@ -46,4 +46,22 @@ export interface WorkoutSession {
   logs: ExerciseLog[];
 }
 
-export type AppView = 'dashboard' | 'builder' | 'active' | 'history' | 'stats';
+export type AppView = 'dashboard' | 'builder' | 'active' | 'history' | 'stats' | 'upload' | 'program';
+
+/** One day in a multi-week program: contains all circuits for that day. */
+export interface ProgramWorkoutDay {
+  week: number;
+  day: number;
+  circuits: Circuit[];
+}
+
+/**
+ * A structured training program created from a CSV upload.
+ * Circuits inside the program are self-contained and not added to the global circuit library.
+ */
+export interface Program {
+  id: string;
+  name: string;
+  totalWeeks: number;
+  schedule: ProgramWorkoutDay[];
+}
