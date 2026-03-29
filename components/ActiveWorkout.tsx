@@ -21,11 +21,12 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         // Find last workout data for this exercise
         const lastWorkoutData = getLastWorkoutDataForExercise(ex.id, ex.name, workoutHistory);
         
-        // Initialize sets with zeros; last workout values are used only as placeholders (see lastWorkoutSets)
+        // Initialize sets: prefer suggested values from CSV, else start at 0.
+        // Last workout data is shown as placeholder text if the field is cleared.
         const sets = Array.from({ length: ex.sets }).map((_, i) => ({
           setIndex: i,
-          value: 0,
-          weight: ex.type === 'weight' ? 0 : undefined
+          value: ex.suggestedValue ?? 0,
+          weight: ex.type === 'weight' ? (ex.suggestedWeight ?? 0) : undefined,
         }));
         
         initialLogs.push({

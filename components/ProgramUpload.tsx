@@ -17,6 +17,8 @@ interface CsvRow {
   exercise_name: string;
   type: ExerciseType;
   sets: number;
+  suggested_weight?: number;
+  suggested_reps?: number;
 }
 
 function parseCSV(raw: string): { rows: CsvRow[]; error: string | null } {
@@ -62,7 +64,12 @@ function parseCSV(raw: string): { rows: CsvRow[]; error: string | null } {
       continue;
     }
 
+    // Optional suggested values — silently ignore if missing or non-numeric
+    const sugWeight = idx('suggested_weight') !== -1 ? parseFloat(get('suggested_weight')) : NaN;
+    const sugReps   = idx('suggested_reps')   !== -1 ? parseFloat(get('suggested_reps'))   : NaN;
     const row: CsvRow = { circuit_name, exercise_name, type, sets };
+    if (!isNaN(sugWeight) && sugWeight > 0) row.suggested_weight = sugWeight;
+    if (!isNaN(sugReps)   && sugReps   > 0) row.suggested_reps   = sugReps;
 
     if (hasWeekDay) {
       const week = parseInt(get('week'), 10);
@@ -85,13 +92,18 @@ function parseCSV(raw: string): { rows: CsvRow[]; error: string | null } {
 // ─── Build circuits from grouped rows ───────────────────────────────────────
 
 function buildCircuit(circuitName: string, exerciseRows: CsvRow[]): Circuit {
-  const exercises: CircuitExercise[] = exerciseRows.map(row => ({
-    id: `csv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    name: row.exercise_name,
-    type: row.type,
-    defaultSets: row.sets,
-    sets: row.sets,
-  }));
+  const exercises: CircuitExercise[] = exerciseRows.map(row => {
+    const ex: CircuitExercise = {
+      id: `csv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      name: row.exercise_name,
+      type: row.type,
+      defaultSets: row.sets,
+      sets: row.sets,
+    };
+    if (row.suggested_weight !== undefined) ex.suggestedWeight = row.suggested_weight;
+    if (row.suggested_reps   !== undefined) ex.suggestedValue  = row.suggested_reps;
+    return ex;
+  });
   return {
     id: `csv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     name: circuitName,
@@ -250,6 +262,7 @@ const ProgramUpload: React.FC<ProgramUploadProps> = ({ onImportCircuits, onImpor
             </div>
           </div>
           <p className="text-[10px] text-indigo-400 font-medium">type must be: weight · reps · duration</p>
+          <p className="text-[10px] text-indigo-400 font-medium mt-1">Optional: add <strong>suggested_weight</strong> and/or <strong>suggested_reps</strong> columns to pre-fill values in the workout</p>
         </div>
 
         {/* Drop zone */}

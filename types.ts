@@ -15,6 +15,9 @@ export interface CustomExercise extends Exercise {
 
 export interface CircuitExercise extends Exercise {
   sets: number;
+  /** Optional suggested values from a CSV import; pre-filled in the active workout. */
+  suggestedWeight?: number;
+  suggestedValue?: number;
 }
 
 export interface Circuit {
