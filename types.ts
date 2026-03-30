@@ -67,4 +67,6 @@ export interface Program {
   name: string;
   totalWeeks: number;
   schedule: ProgramWorkoutDay[];
+  /** Days the user has finished at least once. Populated by the app; not part of the CSV. */
+  completedDays?: { week: number; day: number }[];
 }

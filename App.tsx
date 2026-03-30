@@ -65,6 +65,8 @@ const App: React.FC = () => {
   const [user, setUser] = useState<AuthedUser | null>(null);
   /** Session that finished while the token was expired; synced on next successful auth. */
   const [pendingSession, setPendingSession] = useState<WorkoutSession | null>(null);
+  /** Which program day is currently being worked out, so we can mark it complete on finish. */
+  const [activeProgramContext, setActiveProgramContext] = useState<{ programId: string; week: number; day: number } | null>(null);
 
   const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -81,6 +83,7 @@ const App: React.FC = () => {
     setDataError(null);
     setActiveCircuits([]);
     setViewingProgram(null);
+    setActiveProgramContext(null);
     setView('dashboard');
 
     try {
@@ -375,24 +378,43 @@ const App: React.FC = () => {
     // Always persist locally first — this guarantees the session survives any network/auth failure.
     saveSession(session);
 
+    // Mark the active program day as completed, if this workout came from a program.
+    let updatedPrograms = programs;
+    if (activeProgramContext) {
+      const { programId, week, day } = activeProgramContext;
+      updatedPrograms = programs.map(p => {
+        if (p.id !== programId) return p;
+        const existing = p.completedDays ?? [];
+        if (existing.some(d => d.week === week && d.day === day)) return p; // already marked
+        return { ...p, completedDays: [...existing, { week, day }] };
+      });
+      setPrograms(updatedPrograms);
+      savePrograms(updatedPrograms);
+      // Keep viewingProgram in sync so ProgramView re-renders with the new checkmark.
+      if (viewingProgram?.id === programId) {
+        setViewingProgram(updatedPrograms.find(p => p.id === programId) ?? null);
+      }
+      setActiveProgramContext(null);
+    }
+
     // If the token is missing or expired, skip the server call and store as pending.
     // The improved on-load merge logic will sync it automatically on next login.
     if (!idToken || isTokenExpired(idToken)) {
       setPendingSession(session);
       setHistory(prev => [session, ...prev]);
       setActiveCircuits([]);
-      setView('history');
+      setView(viewingProgram ? 'program' : 'history');
       setDataError('Session expired — workout saved locally and will sync on next sign-in.');
       return;
     }
 
     setHistory(prev => {
       const next = [session, ...prev];
-      void persistUserData(circuits, next, customExercises);
+      void persistUserData(circuits, next, customExercises, updatedPrograms);
       return next;
     });
     setActiveCircuits([]);
-    setView('history');
+    setView(viewingProgram ? 'program' : 'history');
   };
 
   const handleLogout = async () => {
@@ -451,6 +473,7 @@ const App: React.FC = () => {
             onFinish={handleFinishWorkout}
             onCancel={() => {
               setActiveCircuits([]);
+              setActiveProgramContext(null);
               setView(viewingProgram ? 'program' : 'dashboard');
             }}
           />
@@ -471,8 +494,9 @@ const App: React.FC = () => {
         return viewingProgram ? (
           <ProgramView
             program={viewingProgram}
-            onStartDay={(daycircuits) => {
-              setActiveCircuits(daycircuits);
+            onStartDay={(workoutDay) => {
+              setActiveCircuits(workoutDay.circuits);
+              setActiveProgramContext({ programId: viewingProgram.id, week: workoutDay.week, day: workoutDay.day });
               setView('active');
             }}
             onDelete={handleDeleteProgram}
