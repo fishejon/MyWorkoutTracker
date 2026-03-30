@@ -44,7 +44,11 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     return initialLogs;
   });
 
-  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  // Use local date components to avoid UTC-midnight timezone issues.
+  const [sessionDate, setSessionDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [startTime] = useState(new Date());
   const [timer, setTimer] = useState(0);
 
@@ -77,10 +81,14 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
 
   const handleFinish = () => {
     if (!window.confirm("Finish workout?")) return;
+    // Build a local-timezone Date from the user-selected date + actual start time,
+    // so the ISO string is anchored to local time (not UTC midnight).
+    const [yr, mo, da] = sessionDate.split('-').map(Number);
+    const localDate = new Date(yr, mo - 1, da, startTime.getHours(), startTime.getMinutes(), startTime.getSeconds());
     onFinish({
       id: Date.now().toString(),
       circuitNames: circuits.map(c => c.name),
-      date: new Date(sessionDate).toISOString(),
+      date: localDate.toISOString(),
       logs
     });
   };
