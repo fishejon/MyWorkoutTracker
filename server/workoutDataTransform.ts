@@ -61,11 +61,15 @@ export function normalizeWorkoutSession(
   // The database will also generate UUIDs, but we need consistent IDs for rounds/sets
   const workoutId = randomUUID();
   
+  // Use the actual workout date as created_at.
+  // We delete-and-reinsert on every sync, so we can't preserve the true DB insert time.
+  // Using the workout date ensures each row has a distinct, meaningful timestamp.
+  const workoutDate = new Date(workoutSession.date);
   const workout: WorkoutRow = {
     workout_id: workoutId,
     user_id: userId,
-    date: new Date(workoutSession.date),
-    created_at: new Date(),
+    date: workoutDate,
+    created_at: workoutDate,
   };
 
   // Group ExerciseLogs by circuitId (guard against missing or invalid logs)
@@ -96,11 +100,11 @@ export function normalizeWorkoutSession(
 
     const round: RoundRow = {
       round_id: roundId,
-      workout_id: workoutId, // Use the generated UUID, not the old timestamp ID
+      workout_id: workoutId,
       circuit_id: circuitId,
       circuit_name: circuitName,
       round_number: roundNumber,
-      created_at: new Date(),
+      created_at: workoutDate,
     };
 
     // Convert all sets from all exercises in this circuit/round
@@ -116,7 +120,7 @@ export function normalizeWorkoutSession(
           set_index: set.setIndex,
           value: set.value,
           weight: set.weight ?? null,
-          created_at: new Date(),
+          created_at: workoutDate,
         });
       }
     }
