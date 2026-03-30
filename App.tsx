@@ -12,6 +12,7 @@ import {
   getPrograms,
   savePrograms,
   fixUtcMidnightDate,
+  saveHistory,
 } from './services/storage';
 import Dashboard from './components/Dashboard';
 import CircuitBuilder from './components/CircuitBuilder';
@@ -421,6 +422,13 @@ const App: React.FC = () => {
     setView(viewingProgram ? 'program' : 'history');
   };
 
+  const handleDeleteSession = (id: string) => {
+    const updated = history.filter(s => s.id !== id);
+    setHistory(updated);
+    saveHistory(updated);
+    void persistUserData(circuits, updated, customExercises);
+  };
+
   const handleLogout = async () => {
     // Best-effort audit trail.
     if (idToken) {
@@ -483,7 +491,7 @@ const App: React.FC = () => {
           />
         ) : null;
       case 'history':
-        return <HistoryView history={history} />;
+        return <HistoryView history={history} onDelete={handleDeleteSession} />;
       case 'stats':
         return <StatsView history={history} />;
       case 'upload':

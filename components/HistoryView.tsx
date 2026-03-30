@@ -1,11 +1,14 @@
 
 import React, { useState } from 'react';
 import { WorkoutSession, ExerciseLog } from '../types';
-import { Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
-interface HistoryViewProps { history: WorkoutSession[]; }
+interface HistoryViewProps {
+  history: WorkoutSession[];
+  onDelete: (id: string) => void;
+}
 
-const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const formatDate = (dateStr: string) =>
@@ -45,26 +48,36 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history }) => {
             className="bg-white rounded-2xl border border-zinc-200 overflow-hidden"
           >
             {/* Session header — tappable */}
-            <button
-              className="w-full text-left px-4 py-4 flex items-center justify-between gap-3 active:bg-zinc-50 transition-colors"
-              onClick={() => setExpandedId(isExpanded ? null : session.id)}
-            >
-              <div className="min-w-0 flex-1">
-                <h4 className="font-semibold text-zinc-900 text-sm truncate">
-                  {session.circuitNames.join(' + ') || 'Workout'}
-                </h4>
-                <p className="text-xs text-zinc-400 font-medium mt-0.5">
-                  {formatDate(session.date)} · {formatTime(session.date)}
-                </p>
-                <p className="text-xs text-zinc-400 mt-1">
-                  {session.logs.length} exercise{session.logs.length !== 1 ? 's' : ''}
-                </p>
+            <div className="px-4 py-4 flex items-center justify-between gap-3">
+              <button
+                className="flex-1 text-left active:opacity-70 transition-opacity min-w-0"
+                onClick={() => setExpandedId(isExpanded ? null : session.id)}
+              >
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-zinc-900 text-sm truncate">
+                    {session.circuitNames.join(' + ') || 'Workout'}
+                  </h4>
+                  <p className="text-xs text-zinc-400 font-medium mt-0.5">
+                    {formatDate(session.date)} · {formatTime(session.date)}
+                  </p>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    {session.logs.length} exercise{session.logs.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={() => onDelete(session.id)}
+                  className="p-1.5 text-zinc-300 hover:text-red-500 transition-colors"
+                  aria-label="Delete session"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                {isExpanded
+                  ? <ChevronUp className="w-4 h-4 text-zinc-400" />
+                  : <ChevronDown className="w-4 h-4 text-zinc-400" onClick={() => setExpandedId(isExpanded ? null : session.id)} />}
               </div>
-              {isExpanded
-                ? <ChevronUp className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-                : <ChevronDown className="w-4 h-4 text-zinc-400 flex-shrink-0" />
-              }
-            </button>
+            </div>
 
             {/* Expanded detail */}
             {isExpanded && (

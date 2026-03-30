@@ -52,6 +52,10 @@ function migrateHistory(sessions: WorkoutSession[]): WorkoutSession[] {
   );
 }
 
+export const saveHistory = (history: WorkoutSession[]) => {
+  localStorage.setItem(nsKey(STORAGE_KEYS.HISTORY), JSON.stringify(history));
+};
+
 export const saveSession = (session: WorkoutSession) => {
   const history = getHistory();
   localStorage.setItem(nsKey(STORAGE_KEYS.HISTORY), JSON.stringify([session, ...history]));
