@@ -34,6 +34,24 @@ export const getCircuits = (): Circuit[] => {
   }
 };
 
+/**
+ * Sessions stored before the local-timezone fix have dates like
+ * "YYYY-MM-DDT00:00:00.000Z" (UTC midnight), which display as the previous
+ * evening for users west of UTC. Shift them to noon UTC — a safe anchor point
+ * that lands on the correct calendar day in all US timezones (UTC-12 to UTC+14).
+ */
+export function fixUtcMidnightDate(dateStr: string): string {
+  return /T00:00:00\.000Z$/.test(dateStr)
+    ? dateStr.replace('T00:00:00.000Z', 'T12:00:00.000Z')
+    : dateStr;
+}
+
+function migrateHistory(sessions: WorkoutSession[]): WorkoutSession[] {
+  return sessions.map(s =>
+    /T00:00:00\.000Z$/.test(s.date) ? { ...s, date: fixUtcMidnightDate(s.date) } : s
+  );
+}
+
 export const saveSession = (session: WorkoutSession) => {
   const history = getHistory();
   localStorage.setItem(nsKey(STORAGE_KEYS.HISTORY), JSON.stringify([session, ...history]));
@@ -42,7 +60,7 @@ export const saveSession = (session: WorkoutSession) => {
 export const getHistory = (): WorkoutSession[] => {
   try {
     const data = localStorage.getItem(nsKey(STORAGE_KEYS.HISTORY));
-    return data ? JSON.parse(data) : [];
+    return data ? migrateHistory(JSON.parse(data)) : [];
   } catch {
     return [];
   }

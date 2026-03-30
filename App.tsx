@@ -11,6 +11,7 @@ import {
   setStorageNamespace,
   getPrograms,
   savePrograms,
+  fixUtcMidnightDate,
 } from './services/storage';
 import Dashboard from './components/Dashboard';
 import CircuitBuilder from './components/CircuitBuilder';
@@ -247,7 +248,10 @@ const App: React.FC = () => {
         };
 
         const serverCircuits = Array.isArray(data.circuits) ? data.circuits : [];
-        const serverHistory = Array.isArray(data.history) ? data.history : [];
+        // Apply UTC-midnight migration to server sessions (same fix as localStorage)
+        const serverHistory = (Array.isArray(data.history) ? data.history : []).map(
+          (s: WorkoutSession) => /T00:00:00\.000Z$/.test(s.date) ? { ...s, date: fixUtcMidnightDate(s.date) } : s
+        );
         const serverCustomExercises = Array.isArray(data.customExercises) ? data.customExercises : [];
         const serverPrograms = Array.isArray(data.programs) ? data.programs : [];
 
