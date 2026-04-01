@@ -21,12 +21,11 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         // Find last workout data for this exercise
         const lastWorkoutData = getLastWorkoutDataForExercise(ex.id, ex.name, workoutHistory);
         
-        // Initialize sets: prefer suggested values from CSV, else start at 0.
-        // Last workout data is shown as placeholder text if the field is cleared.
+        // Always start empty — placeholders show history first, then CSV suggestion.
         const sets = Array.from({ length: ex.sets }).map((_, i) => ({
           setIndex: i,
-          value: ex.suggestedValue ?? 0,
-          weight: ex.type === 'weight' ? (ex.suggestedWeight ?? 0) : undefined,
+          value: 0,
+          weight: ex.type === 'weight' ? 0 : undefined,
         }));
         
         initialLogs.push({
@@ -36,8 +35,9 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
           circuitId: circuit.id,
           circuitName: circuit.name,
           sets,
-          // Store last workout sets for display purposes
-          lastWorkoutSets: lastWorkoutData?.sets
+          lastWorkoutSets: lastWorkoutData?.sets,
+          suggestedWeight: ex.suggestedWeight,
+          suggestedValue: ex.suggestedValue,
         });
       });
     });
@@ -241,6 +241,18 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                               );
                             }
 
+                            // Placeholder priority: last workout → CSV suggestion → ·
+                            const wPh = (lastSet?.weight && lastSet.weight > 0)
+                              ? String(lastSet.weight)
+                              : (log.suggestedWeight && log.suggestedWeight > 0)
+                                ? String(log.suggestedWeight)
+                                : '·';
+                            const vPh = (lastSet?.value && lastSet.value > 0)
+                              ? String(lastSet.value)
+                              : (log.suggestedValue && log.suggestedValue > 0)
+                                ? String(log.suggestedValue)
+                                : '·';
+
                             // Weight exercise: two side-by-side inputs (lbs | reps)
                             if (log.type === 'weight') {
                               return (
@@ -249,7 +261,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                                     <input
                                       type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*"
                           className="w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
-                                      placeholder={lastSet?.weight && lastSet.weight > 0 ? String(lastSet.weight) : '·'}
+                                      placeholder={wPh}
                                       value={set.weight === 0 ? '' : set.weight}
                                       onChange={(e) => updateLog(logIdx, si, 'weight', e.target.value)}
                                     />
@@ -258,7 +270,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                                     <input
                                       type="text" inputMode="numeric" pattern="[0-9]*"
                           className="w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
-                                      placeholder={lastSet?.value && lastSet.value > 0 ? String(lastSet.value) : '·'}
+                                      placeholder={vPh}
                                       value={set.value === 0 ? '' : set.value}
                                       onChange={(e) => updateLog(logIdx, si, 'value', e.target.value)}
                                     />
@@ -277,7 +289,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                                       ? 'w-16 focus:border-amber-400 focus:bg-white'
                                       : 'w-14 focus:border-emerald-400 focus:bg-white'
                                   }`}
-                                  placeholder={lastSet?.value && lastSet.value > 0 ? String(lastSet.value) : '·'}
+                                  placeholder={vPh}
                                   value={set.value === 0 ? '' : set.value}
                                   onChange={(e) => updateLog(logIdx, si, 'value', e.target.value)}
                                 />
