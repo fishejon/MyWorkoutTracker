@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
 import { AppView, Circuit, WorkoutSession, CustomExercise, Program } from './types';
@@ -429,6 +429,12 @@ const App: React.FC = () => {
     void persistUserData(circuits, updated, customExercises);
   };
 
+  // Unique sorted category list derived from circuits — passed to CircuitBuilder for suggestions.
+  const existingCategories = useMemo(
+    () => [...new Set(circuits.map(c => c.category).filter((c): c is string => !!c))].sort(),
+    [circuits]
+  );
+
   const handleLogout = async () => {
     // Best-effort audit trail.
     if (idToken) {
@@ -468,6 +474,7 @@ const App: React.FC = () => {
           <CircuitBuilder
             initialCircuit={editingCircuit}
             customExercises={customExercises}
+            existingCategories={existingCategories}
             onSaveCustomExercise={handleSaveCustomExercise}
             onSave={handleCreateCircuit}
             onUpdate={handleUpdateCircuit}

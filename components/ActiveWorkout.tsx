@@ -161,15 +161,15 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                 <div className="h-px w-full bg-zinc-200" />
               </div>
 
-              <div className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden">
+              <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
+                  <table className="border-collapse" style={{ minWidth: '100%' }}>
                     <thead>
                       {/* Primary header: Exercise | Set 1 | Set 2 | … */}
                       <tr className="bg-zinc-50 border-b border-zinc-100">
                         <th
-                          className="text-left px-4 py-3 text-[9px] font-medium text-zinc-400 uppercase tracking-wide"
-                          style={{ minWidth: '130px' }}
+                          className="text-left px-4 py-3 text-[9px] font-medium text-zinc-400 uppercase tracking-wide sticky left-0 z-20 bg-zinc-50"
+                          style={{ minWidth: '140px', boxShadow: '2px 0 6px rgba(0,0,0,0.04)' }}
                         >
                           Exercise
                         </th>
@@ -178,7 +178,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                             key={si}
                             colSpan={hasWeightEx ? 2 : 1}
                             className="px-2 py-2.5 text-[9px] font-medium text-sky-400 uppercase tracking-wide text-center border-l border-zinc-100"
-                            style={{ minWidth: hasWeightEx ? '84px' : '56px' }}
+                            style={{ minWidth: hasWeightEx ? '108px' : '72px' }}
                           >
                             Set {si + 1}
                           </th>
@@ -186,7 +186,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                       </tr>
                       {hasWeightEx && (
                         <tr className="border-b border-zinc-100 bg-zinc-50/50">
-                          <td className="px-4 py-1" />
+                          <td className="px-4 py-1 sticky left-0 z-20 bg-zinc-50/90" style={{ boxShadow: '2px 0 6px rgba(0,0,0,0.04)' }} />
                           {setIndices.map(si => (
                             <React.Fragment key={si}>
                               <td className="py-1 text-center border-l border-zinc-100">
@@ -203,8 +203,8 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                     <tbody className="divide-y divide-slate-50">
                       {logsWithIndices.map(({ log, index: logIdx }) => (
                         <tr key={`${log.exerciseId}-${logIdx}`}>
-                          {/* Exercise name + type badge */}
-                          <td className="px-4 py-3">
+                          {/* Exercise name + type badge — sticky frozen column */}
+                          <td className="px-4 py-3 sticky left-0 z-10 bg-white" style={{ boxShadow: '2px 0 6px rgba(0,0,0,0.04)' }}>
                             <p className="font-semibold text-zinc-900 text-sm leading-tight">{log.exerciseName}</p>
                             <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[7px] font-medium tracking-wide ${
                               log.type === 'weight' ? 'bg-zinc-100 text-sky-500' :
@@ -248,7 +248,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                                   <td className="px-1 py-3 border-l border-slate-100">
                                     <input
                                       type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*"
-                          className="w-10 h-10 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
+                          className="w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
                                       placeholder={lastSet?.weight && lastSet.weight > 0 ? String(lastSet.weight) : '·'}
                                       value={set.weight === 0 ? '' : set.weight}
                                       onChange={(e) => updateLog(logIdx, si, 'weight', e.target.value)}
@@ -257,7 +257,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                                   <td className="px-1 py-3">
                                     <input
                                       type="text" inputMode="numeric" pattern="[0-9]*"
-                          className="w-10 h-10 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
+                          className="w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
                                       placeholder={lastSet?.value && lastSet.value > 0 ? String(lastSet.value) : '·'}
                                       value={set.value === 0 ? '' : set.value}
                                       onChange={(e) => updateLog(logIdx, si, 'value', e.target.value)}
@@ -272,10 +272,10 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                               <td key={si} colSpan={hasWeightEx ? 2 : 1} className="px-2 py-3 border-l border-slate-100">
                                 <input
                                   type="text" inputMode="numeric" pattern="[0-9]*"
-                                  className={`h-10 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none transition-all text-center block mx-auto ${
+                                  className={`h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none transition-all text-center block mx-auto ${
                                     log.type === 'duration'
-                                      ? 'w-14 focus:border-amber-400 focus:bg-white'
-                                      : 'w-12 focus:border-emerald-400 focus:bg-white'
+                                      ? 'w-16 focus:border-amber-400 focus:bg-white'
+                                      : 'w-14 focus:border-emerald-400 focus:bg-white'
                                   }`}
                                   placeholder={lastSet?.value && lastSet.value > 0 ? String(lastSet.value) : '·'}
                                   value={set.value === 0 ? '' : set.value}

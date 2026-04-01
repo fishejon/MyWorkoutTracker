@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { Circuit, WorkoutSession, Program } from '../types';
 import {
   Play, Trash2, PlusCircle, Pencil, Check, Upload,
-  BookOpen, ChevronLeft, ChevronRight, Flame, Clock,
+  BookOpen, ChevronLeft, ChevronRight, Flame, Clock, ChevronDown,
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -163,6 +163,27 @@ const Dashboard: React.FC<DashboardProps> = ({
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
+  // Group circuits by category; uncategorized goes last
+  const { categoryGroups, uncategorized } = useMemo(() => {
+    const groups = new Map<string, Circuit[]>();
+    const uncategorized: Circuit[] = [];
+    for (const c of circuits) {
+      if (c.category?.trim()) {
+        const key = c.category.trim();
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(c);
+      } else {
+        uncategorized.push(c);
+      }
+    }
+    return { categoryGroups: groups, uncategorized };
+  }, [circuits]);
+
+  // Which category groups are collapsed (default: all expanded)
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
+  const toggleCat = (cat: string) =>
+    setCollapsedCats(prev => { const n = new Set(prev); n.has(cat) ? n.delete(cat) : n.add(cat); return n; });
+
   return (
     <div className="p-4 space-y-5">
 
@@ -290,6 +311,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             New Circuit
           </button>
         </div>
+
         {circuits.length === 0 ? (
           <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-zinc-300">
             <p className="text-zinc-400 text-sm mb-3">No circuits yet.</p>
@@ -298,8 +320,77 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
           </div>
         ) : (
-          <div className="grid gap-2">
-            {circuits.map((circuit) => {
+          <div className="space-y-2">
+            {/* Category groups */}
+            {Array.from(categoryGroups.entries()).map(([cat, catCircuits]) => {
+              const isCollapsed = collapsedCats.has(cat);
+              const selectedInCat = catCircuits.filter(c => selectedIds.includes(c.id)).length;
+              return (
+                <div key={cat} className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                  {/* Category header */}
+                  <button
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-50 transition-colors"
+                    onClick={() => toggleCat(cat)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-zinc-800">{cat}</span>
+                      <span className="text-[10px] font-medium text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">
+                        {catCircuits.length}
+                      </span>
+                      {selectedInCat > 0 && (
+                        <span className="text-[10px] font-semibold text-sky-500 bg-sky-50 px-1.5 py-0.5 rounded-md">
+                          {selectedInCat} selected
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`} />
+                  </button>
+                  {/* Circuit rows */}
+                  {!isCollapsed && (
+                    <div className="border-t border-zinc-100 divide-y divide-zinc-50">
+                      {catCircuits.map(circuit => {
+                        const isSelected = selectedIds.includes(circuit.id);
+                        const names = circuit.exercises.map(ex => ex.name);
+                        const preview = `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` +${names.length - 3}` : ''}`;
+                        return (
+                          <div
+                            key={circuit.id}
+                            className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-colors ${
+                              isSelected ? 'bg-zinc-50' : 'hover:bg-zinc-50/50'
+                            }`}
+                            onClick={() => toggleSelection(circuit.id)}
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors flex-shrink-0 ${
+                                isSelected ? 'bg-zinc-900 border-zinc-900' : 'border-zinc-300'
+                              }`}>
+                                {isSelected && <Check className="w-3 h-3 text-white" />}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="font-semibold text-zinc-900 text-sm truncate">{circuit.name}</h4>
+                                <p className="text-zinc-400 text-[10px] truncate">{preview}</p>
+                                <p className="text-zinc-300 text-[10px] mt-0.5">{circuitLastUsed[circuit.id]}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-0.5 ml-2">
+                              <button onClick={(e) => { e.stopPropagation(); onEdit(circuit); }} className="p-1.5 text-zinc-300 hover:text-zinc-600 transition-colors" aria-label={`Edit ${circuit.name}`}>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); onDelete(circuit.id); }} className="p-1.5 text-zinc-300 hover:text-red-500 transition-colors" aria-label={`Delete ${circuit.name}`}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Uncategorized circuits — flat list, no accordion wrapper */}
+            {uncategorized.map(circuit => {
               const isSelected = selectedIds.includes(circuit.id);
               const names = circuit.exercises.map(ex => ex.name);
               const preview = `${names.slice(0, 3).join(', ')}${names.length > 3 ? ` +${names.length - 3}` : ''}`;
@@ -319,7 +410,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div className="min-w-0">
                       <h4 className="font-semibold text-zinc-900 text-sm truncate">{circuit.name}</h4>
-                      <p className="text-zinc-400 text-[10px] font-medium truncate">{preview}</p>
+                      <p className="text-zinc-400 text-[10px] truncate">{preview}</p>
                       <p className="text-zinc-300 text-[10px] mt-0.5">{circuitLastUsed[circuit.id]}</p>
                     </div>
                   </div>

@@ -7,6 +7,7 @@ import { Search, Plus, X, ChevronRight, Layers, ArrowLeft } from 'lucide-react';
 interface CircuitBuilderProps {
   initialCircuit?: Circuit | null;
   customExercises: CustomExercise[];
+  existingCategories: string[];
   onSaveCustomExercise: (ex: CustomExercise) => void;
   onSave: (circuit: Circuit) => void;
   onUpdate: (circuit: Circuit) => void;
@@ -16,12 +17,14 @@ interface CircuitBuilderProps {
 const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
   initialCircuit,
   customExercises,
+  existingCategories,
   onSaveCustomExercise,
   onSave,
   onUpdate,
   onCancel,
 }) => {
   const [name, setName] = useState(initialCircuit?.name ?? '');
+  const [category, setCategory] = useState(initialCircuit?.category ?? '');
   const [selectedExercises, setSelectedExercises] = useState<CircuitExercise[]>(initialCircuit?.exercises ?? []);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -31,6 +34,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
   // Sync state when opening builder for a different circuit
   useEffect(() => {
     setName(initialCircuit?.name ?? '');
+    setCategory(initialCircuit?.category ?? '');
     setSelectedExercises(initialCircuit?.exercises ?? []);
     setSelectedGroup(null);
     setSearchQuery('');
@@ -83,6 +87,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
       id: initialCircuit?.id ?? Date.now().toString(),
       name: name.trim(),
       exercises: selectedExercises,
+      ...(category.trim() ? { category: category.trim() } : {}),
     };
 
     if (isEditing) {
@@ -127,16 +132,46 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Name Input */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-          <label className="block text-xs font-medium text-zinc-400 mb-2">Circuit name</label>
-          <input 
-            type="text" 
-            placeholder="e.g., Strength Day"
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-400"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+        {/* Name + Category */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-2">Circuit name</label>
+            <input
+              type="text"
+              placeholder="e.g., Strength Day"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-400"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-2">Category <span className="text-zinc-300">(optional)</span></label>
+            <input
+              type="text"
+              placeholder="e.g., Push, Legs, Cardio"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-400"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
+            {existingCategories.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {existingCategories.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategory(cat)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      category === cat
+                        ? 'bg-zinc-900 text-white'
+                        : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Selected List */}

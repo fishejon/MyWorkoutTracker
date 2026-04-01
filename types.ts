@@ -24,6 +24,8 @@ export interface Circuit {
   id: string;
   name: string;
   exercises: CircuitExercise[];
+  /** Optional user-defined category for grouping on the dashboard. */
+  category?: string;
 }
 
 export interface SetLog {
