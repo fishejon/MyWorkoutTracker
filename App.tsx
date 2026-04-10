@@ -69,6 +69,10 @@ const App: React.FC = () => {
   const [pendingSession, setPendingSession] = useState<WorkoutSession | null>(null);
   /** Which program day is currently being worked out, so we can mark it complete on finish. */
   const [activeProgramContext, setActiveProgramContext] = useState<{ programId: string; week: number; day: number } | null>(null);
+  /** Circuit being edited within a program (opens CircuitBuilder inline in the 'program' view). */
+  const [editingProgramCircuit, setEditingProgramCircuit] = useState<{
+    programId: string; week: number; day: number; circuitIdx: number; circuit: Circuit;
+  } | null>(null);
 
   const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -86,6 +90,7 @@ const App: React.FC = () => {
     setActiveCircuits([]);
     setViewingProgram(null);
     setActiveProgramContext(null);
+    setEditingProgramCircuit(null);
     setView('dashboard');
 
     try {
@@ -422,6 +427,46 @@ const App: React.FC = () => {
     setView(viewingProgram ? 'program' : 'history');
   };
 
+  const handleUpdateProgramCircuit = (updatedCircuit: Circuit) => {
+    if (!editingProgramCircuit || !viewingProgram) return;
+    const { programId, week, day, circuitIdx } = editingProgramCircuit;
+    const updatedProgram: Program = {
+      ...viewingProgram,
+      schedule: viewingProgram.schedule.map(d =>
+        d.week === week && d.day === day
+          ? { ...d, circuits: d.circuits.map((c, i) => i === circuitIdx ? updatedCircuit : c) }
+          : d
+      ),
+    };
+    const updatedPrograms = programs.map(p => p.id === programId ? updatedProgram : p);
+    setPrograms(updatedPrograms);
+    setViewingProgram(updatedProgram);
+    savePrograms(updatedPrograms);
+    void persistUserData(circuits, history, customExercises, updatedPrograms);
+    setEditingProgramCircuit(null);
+  };
+
+  /** Inline edits from ProgramView: drops circuits with no exercises. */
+  const handlePatchProgramCircuit = (week: number, day: number, circuitIdx: number, nextCircuit: Circuit) => {
+    if (!viewingProgram) return;
+    const programId = viewingProgram.id;
+    const updatedProgram: Program = {
+      ...viewingProgram,
+      schedule: viewingProgram.schedule.map(d => {
+        if (d.week !== week || d.day !== day) return d;
+        const circuits = d.circuits
+          .map((c, i) => (i === circuitIdx ? nextCircuit : c))
+          .filter(c => c.exercises.length > 0);
+        return { ...d, circuits };
+      }),
+    };
+    const updatedPrograms = programs.map(p => (p.id === programId ? updatedProgram : p));
+    setPrograms(updatedPrograms);
+    setViewingProgram(updatedProgram);
+    savePrograms(updatedPrograms);
+    void persistUserData(circuits, history, customExercises, updatedPrograms);
+  };
+
   const handleDeleteSession = (id: string) => {
     const updated = history.filter(s => s.id !== id);
     setHistory(updated);
@@ -510,13 +555,34 @@ const App: React.FC = () => {
           />
         );
       case 'program':
-        return viewingProgram ? (
+        if (!viewingProgram) return null;
+        // If a program circuit is being edited, show CircuitBuilder as a full-screen overlay.
+        if (editingProgramCircuit?.programId === viewingProgram.id) {
+          return (
+            <CircuitBuilder
+              initialCircuit={editingProgramCircuit.circuit}
+              customExercises={customExercises}
+              existingCategories={existingCategories}
+              onSaveCustomExercise={handleSaveCustomExercise}
+              onSave={() => { /* isEditing=true, so onUpdate is called instead */ }}
+              onUpdate={handleUpdateProgramCircuit}
+              onCancel={() => setEditingProgramCircuit(null)}
+            />
+          );
+        }
+        return (
           <ProgramView
             program={viewingProgram}
+            customExercises={customExercises}
+            onSaveCustomExercise={handleSaveCustomExercise}
+            onPatchCircuit={handlePatchProgramCircuit}
             onStartDay={(workoutDay) => {
               setActiveCircuits(workoutDay.circuits);
               setActiveProgramContext({ programId: viewingProgram.id, week: workoutDay.week, day: workoutDay.day });
               setView('active');
+            }}
+            onEditCircuit={(circuit, week, day, circuitIdx) => {
+              setEditingProgramCircuit({ programId: viewingProgram.id, week, day, circuitIdx, circuit });
             }}
             onDelete={handleDeleteProgram}
             onBack={() => {
@@ -524,7 +590,7 @@ const App: React.FC = () => {
               setView('dashboard');
             }}
           />
-        ) : null;
+        );
       default:
         return (
           <Dashboard

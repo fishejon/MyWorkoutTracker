@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Circuit, WorkoutSession, ExerciseLog } from '../types';
-import { CheckCircle2, ChevronLeft, Timer, LayoutGrid } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Timer, LayoutGrid, SkipForward } from 'lucide-react';
 import { getHistory, getLastWorkoutDataForExercise } from '../services/storage';
 
 interface ActiveWorkoutProps {
@@ -51,6 +51,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   });
   const [startTime] = useState(new Date());
   const [timer, setTimer] = useState(0);
+  const [restRemaining, setRestRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -58,6 +59,24 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     }, 1000);
     return () => clearInterval(interval);
   }, [startTime]);
+
+  const restActive = restRemaining !== null && restRemaining > 0;
+  useEffect(() => {
+    if (!restActive) return;
+    const id = window.setInterval(() => {
+      setRestRemaining(r => {
+        if (r === null || r <= 1) return 0;
+        return r - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [restActive]);
+
+  useEffect(() => {
+    if (restRemaining !== 0) return;
+    const t = window.setTimeout(() => setRestRemaining(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [restRemaining]);
 
   const updateLog = useCallback((logIdx: number, setIdx: number, field: 'value' | 'weight', val: string | number) => {
     const numVal = typeof val === 'string' 
@@ -99,6 +118,12 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const startRest = (seconds: number) => {
+    setRestRemaining(seconds);
+  };
+
+  const skipRest = () => setRestRemaining(null);
+
   const groupedLogs = circuits.map(c => ({
     circuit: c,
     logsWithIndices: logs
@@ -111,13 +136,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       {/* Header */}
       <div className="bg-zinc-900 p-4 flex items-center justify-between z-50 text-white shadow-sm shrink-0">
         <button onClick={onCancel} className="p-2 active:scale-90 transition-transform bg-white/10 rounded-full"><ChevronLeft /></button>
-        <div className="text-center">
-          <h2 className="text-xs font-medium text-white/50 mb-0.5">Session</h2>
-          <div className="flex items-center justify-center gap-1.5 text-lg font-bold">
-            <Timer className="w-4 h-4 text-white/40" />
-            <span>{formatTime(timer)}</span>
-          </div>
-        </div>
+        <h2 className="text-xs font-medium text-white/50">Session</h2>
         <button
           onClick={handleFinish}
           className="bg-white text-zinc-900 font-semibold text-xs px-4 py-2 rounded-xl active:scale-95 transition-transform"
@@ -126,8 +145,59 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         </button>
       </div>
 
+      {/* Floats above scroll area (absolute in column): session clock + rest — stays visible while scrolling */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 z-[100] w-[min(22rem,calc(100%-1rem))] pointer-events-auto"
+        style={{
+          top: 'max(4.75rem, calc(env(safe-area-inset-top, 0px) + 4rem))',
+        }}
+      >
+        <div className="rounded-2xl bg-zinc-900/95 text-white shadow-lg border border-white/10 backdrop-blur-md px-3 py-2.5 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Timer className="w-4 h-4 text-sky-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[9px] font-medium text-white/45 uppercase tracking-wide">Elapsed</p>
+                <p className="text-lg font-bold tabular-nums leading-tight">{formatTime(timer)}</p>
+              </div>
+            </div>
+            {restRemaining !== null && restRemaining > 0 && (
+              <button
+                type="button"
+                onClick={skipRest}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-semibold flex-shrink-0"
+              >
+                <SkipForward className="w-3.5 h-3.5" />
+                Skip
+              </button>
+            )}
+          </div>
+          {restRemaining === null || restRemaining === 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {[45, 60, 90, 120].map(sec => (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => startRest(sec)}
+                  className="flex-1 min-w-[3.25rem] py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[10px] font-semibold tabular-nums"
+                >
+                  {sec}s
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-0.5">
+              <p className="text-[9px] font-medium text-white/45 uppercase tracking-wide">Rest</p>
+              <p className={`text-2xl font-black tabular-nums ${restRemaining === 0 ? 'text-sky-300' : ''}`}>
+                {restRemaining === 0 ? 'Done' : formatTime(restRemaining)}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8 pb-40">
+      <div className="flex-1 overflow-y-auto px-4 pt-32 pb-40 space-y-8">
         {/* Info Row */}
         <div className="bg-white p-4 rounded-2xl border border-zinc-200 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
