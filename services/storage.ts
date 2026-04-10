@@ -2,6 +2,7 @@
 import { Circuit, WorkoutSession, ExerciseLog, Program } from '../types';
 // Fix: STORAGE_KEYS is exported from constants.ts, not types.ts
 import { STORAGE_KEYS } from '../constants';
+import { dedupeWorkoutHistoryByContent } from './workoutSessionFingerprint';
 
 let storageNamespace: string | null = null;
 
@@ -58,13 +59,19 @@ export const saveHistory = (history: WorkoutSession[]) => {
 
 export const saveSession = (session: WorkoutSession) => {
   const history = getHistory();
-  localStorage.setItem(nsKey(STORAGE_KEYS.HISTORY), JSON.stringify([session, ...history]));
+  const merged = dedupeWorkoutHistoryByContent([session, ...history]);
+  localStorage.setItem(nsKey(STORAGE_KEYS.HISTORY), JSON.stringify(merged));
 };
 
 export const getHistory = (): WorkoutSession[] => {
   try {
     const data = localStorage.getItem(nsKey(STORAGE_KEYS.HISTORY));
-    return data ? migrateHistory(JSON.parse(data)) : [];
+    const raw = data ? migrateHistory(JSON.parse(data)) : [];
+    const deduped = dedupeWorkoutHistoryByContent(raw);
+    if (deduped.length !== raw.length) {
+      localStorage.setItem(nsKey(STORAGE_KEYS.HISTORY), JSON.stringify(deduped));
+    }
+    return deduped;
   } catch {
     return [];
   }

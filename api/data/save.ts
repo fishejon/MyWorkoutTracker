@@ -1,6 +1,7 @@
 import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../server/googleAuth.js';
 import { ensureAppSchema, getSql } from '../../server/db.js';
 import { normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
+import { dedupeWorkoutHistoryByContent } from '../../services/workoutSessionFingerprint.js';
 import { WorkoutSession, CustomExercise, Program } from '../../types.js';
 
 const MAX_CUSTOM_EXERCISES = 500;
@@ -120,7 +121,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       uniqueWorkouts.set(workoutSession.id, workoutSession);
     }
-    const deduplicatedHistory = Array.from(uniqueWorkouts.values());
+    let deduplicatedHistory = Array.from(uniqueWorkouts.values());
+    // Same workout can appear twice with different ids (legacy client ids vs DB UUIDs).
+    deduplicatedHistory = dedupeWorkoutHistoryByContent(deduplicatedHistory);
 
     // Ensure the user exists in users table (verify route usually handles this).
     await sql`

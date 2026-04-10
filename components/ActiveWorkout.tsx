@@ -105,7 +105,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     const [yr, mo, da] = sessionDate.split('-').map(Number);
     const localDate = new Date(yr, mo - 1, da, startTime.getHours(), startTime.getMinutes(), startTime.getSeconds());
     onFinish({
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       circuitNames: circuits.map(c => c.name),
       date: localDate.toISOString(),
       logs

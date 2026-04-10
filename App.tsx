@@ -14,6 +14,10 @@ import {
   fixUtcMidnightDate,
   saveHistory,
 } from './services/storage';
+import {
+  dedupeWorkoutHistoryByContent,
+  workoutSessionFingerprint,
+} from './services/workoutSessionFingerprint';
 import Dashboard from './components/Dashboard';
 import CircuitBuilder from './components/CircuitBuilder';
 import ActiveWorkout from './components/ActiveWorkout';
@@ -267,10 +271,16 @@ const App: React.FC = () => {
         // Merge: find local sessions not present on server (e.g. saved during an expired-token finish)
         // and prepend them so they are not lost. Then push the merged set to the server.
         const serverSessionIds = new Set(serverHistory.map((s: WorkoutSession) => s.id));
-        const missingSessions = localHistory.filter((s: WorkoutSession) => !serverSessionIds.has(s.id));
-        const nextHistory = missingSessions.length > 0
-          ? [...missingSessions, ...serverHistory]
-          : serverHistory;
+        const serverFingerprints = new Set(serverHistory.map(workoutSessionFingerprint));
+        const missingSessions = localHistory.filter((s: WorkoutSession) => {
+          if (serverSessionIds.has(s.id)) return false;
+          if (serverFingerprints.has(workoutSessionFingerprint(s))) return false;
+          return true;
+        });
+        let nextHistory =
+          missingSessions.length > 0 ? [...missingSessions, ...serverHistory] : serverHistory;
+        nextHistory = dedupeWorkoutHistoryByContent(nextHistory);
+        saveHistory(nextHistory);
         const nextCustomExercises = serverCustomExercises.length > 0 ? serverCustomExercises : [];
         const localPrograms = getPrograms();
         const nextPrograms = serverPrograms.length > 0 ? serverPrograms : localPrograms;
@@ -411,7 +421,7 @@ const App: React.FC = () => {
     // The improved on-load merge logic will sync it automatically on next login.
     if (!idToken || isTokenExpired(idToken)) {
       setPendingSession(session);
-      setHistory(prev => [session, ...prev]);
+      setHistory(prev => dedupeWorkoutHistoryByContent([session, ...prev]));
       setActiveCircuits([]);
       setView(viewingProgram ? 'program' : 'history');
       setDataError('Session expired — workout saved locally and will sync on next sign-in.');
@@ -419,7 +429,7 @@ const App: React.FC = () => {
     }
 
     setHistory(prev => {
-      const next = [session, ...prev];
+      const next = dedupeWorkoutHistoryByContent([session, ...prev]);
       void persistUserData(circuits, next, customExercises, updatedPrograms);
       return next;
     });
