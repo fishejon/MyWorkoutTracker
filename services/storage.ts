@@ -1,5 +1,5 @@
 
-import { Circuit, WorkoutSession, ExerciseLog, Program } from '../types';
+import { ActiveWorkoutDraft, Circuit, WorkoutSession, ExerciseLog, Program } from '../types';
 // Fix: STORAGE_KEYS is exported from constants.ts, not types.ts
 import { STORAGE_KEYS } from '../constants';
 import { dedupeWorkoutHistoryByContent } from './workoutSessionFingerprint';
@@ -17,10 +17,74 @@ export const clearUserStorage = () => {
     localStorage.removeItem(nsKey(STORAGE_KEYS.CIRCUITS));
     localStorage.removeItem(nsKey(STORAGE_KEYS.HISTORY));
     localStorage.removeItem(nsKey(STORAGE_KEYS.PROGRAMS));
+    localStorage.removeItem(nsKey(STORAGE_KEYS.ACTIVE_WORKOUT_DRAFT));
   } catch {
     // ignore
   }
 };
+
+export function activeWorkoutCircuitKey(circuits: Circuit[]): string {
+  return [...circuits.map(c => c.id)].sort().join('|');
+}
+
+export function activeWorkoutDraftMatches(draft: ActiveWorkoutDraft, circuits: Circuit[]): boolean {
+  if (draft.circuitKey !== activeWorkoutCircuitKey(circuits)) return false;
+  const expectedIds: string[] = [];
+  for (const c of circuits) {
+    for (const ex of c.exercises) expectedIds.push(ex.id);
+  }
+  if (!Array.isArray(draft.logs) || draft.logs.length !== expectedIds.length) return false;
+  return draft.logs.every((log, i) => log && log.exerciseId === expectedIds[i]);
+}
+
+export function getActiveWorkoutDraft(): ActiveWorkoutDraft | null {
+  try {
+    const raw = localStorage.getItem(nsKey(STORAGE_KEYS.ACTIVE_WORKOUT_DRAFT));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ActiveWorkoutDraft;
+    if (
+      typeof parsed.circuitKey !== 'string' ||
+      typeof parsed.sessionDate !== 'string' ||
+      typeof parsed.clockISO !== 'string' ||
+      !Array.isArray(parsed.logs)
+    ) {
+      return null;
+    }
+    const fromClock = Date.parse(parsed.clockISO);
+    const workoutStartedAtEpoch =
+      typeof parsed.workoutStartedAtEpoch === 'number' && parsed.workoutStartedAtEpoch > 0
+        ? parsed.workoutStartedAtEpoch
+        : Number.isNaN(fromClock)
+          ? Date.now()
+          : fromClock;
+    return {
+      ...parsed,
+      workoutStartedAtEpoch,
+      stopwatchAccumMs: typeof parsed.stopwatchAccumMs === 'number' ? parsed.stopwatchAccumMs : 0,
+      stopwatchRunning: Boolean(parsed.stopwatchRunning),
+      stopwatchSegmentStartEpoch:
+        typeof parsed.stopwatchSegmentStartEpoch === 'number' ? parsed.stopwatchSegmentStartEpoch : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveActiveWorkoutDraft(draft: ActiveWorkoutDraft): void {
+  try {
+    localStorage.setItem(nsKey(STORAGE_KEYS.ACTIVE_WORKOUT_DRAFT), JSON.stringify(draft));
+  } catch {
+    // ignore
+  }
+}
+
+export function clearActiveWorkoutDraft(): void {
+  try {
+    localStorage.removeItem(nsKey(STORAGE_KEYS.ACTIVE_WORKOUT_DRAFT));
+  } catch {
+    // ignore
+  }
+}
 
 export const saveCircuits = (circuits: Circuit[]) => {
   localStorage.setItem(nsKey(STORAGE_KEYS.CIRCUITS), JSON.stringify(circuits));

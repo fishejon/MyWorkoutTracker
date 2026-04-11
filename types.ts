@@ -52,6 +52,23 @@ export interface WorkoutSession {
   circuitNames: string[]; // List of names of circuits performed in this session
   date: string;
   logs: ExerciseLog[];
+  /** Seconds from starting the active workout until Finish (client-only; may be absent after older server sync). */
+  durationSeconds?: number;
+}
+
+/** In-progress workout persisted to localStorage for refresh / crash recovery. */
+export interface ActiveWorkoutDraft {
+  circuitKey: string;
+  sessionDate: string;
+  /** Wall clock when the session started (used with sessionDate when finishing) */
+  clockISO: string;
+  /** Epoch ms when this workout session began (total elapsed timer, survives refresh) */
+  workoutStartedAtEpoch: number;
+  logs: ExerciseLog[];
+  stopwatchAccumMs: number;
+  stopwatchRunning: boolean;
+  /** Epoch ms when the current stopwatch segment started, if running */
+  stopwatchSegmentStartEpoch: number | null;
 }
 
 export type AppView = 'dashboard' | 'builder' | 'active' | 'history' | 'stats' | 'upload' | 'program';

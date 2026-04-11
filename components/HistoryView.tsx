@@ -17,6 +17,16 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete }) => {
   const formatTime = (dateStr: string) =>
     new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
+  const formatSessionDuration = (sec: number) => {
+    const s = Math.max(0, Math.floor(sec));
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    return rm > 0 ? `${h}h ${rm}m` : `${h}h`;
+  };
+
   if (history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 px-8 text-center">
@@ -59,6 +69,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete }) => {
                   </h4>
                   <p className="text-xs text-zinc-400 font-medium mt-0.5">
                     {formatDate(session.date)} · {formatTime(session.date)}
+                    {typeof session.durationSeconds === 'number' && session.durationSeconds > 0 && (
+                      <> · {formatSessionDuration(session.durationSeconds)}</>
+                    )}
                   </p>
                   <p className="text-xs text-zinc-400 mt-1">
                     {session.logs.length} exercise{session.logs.length !== 1 ? 's' : ''}
