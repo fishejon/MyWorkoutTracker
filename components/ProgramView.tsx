@@ -31,6 +31,7 @@ interface ProgramViewProps {
   onSaveCustomExercise: (ex: CustomExercise) => void;
   onPatchCircuit: (week: number, day: number, circuitIdx: number, circuit: Circuit) => void;
   onStartDay: (workoutDay: ProgramWorkoutDay) => void;
+  onToggleDayComplete: (week: number, day: number) => void;
   onEditCircuit: (circuit: Circuit, week: number, day: number, circuitIdx: number) => void;
   onDelete: (id: string) => void;
   onBack: () => void;
@@ -45,6 +46,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
   onSaveCustomExercise,
   onPatchCircuit,
   onStartDay,
+  onToggleDayComplete,
   onEditCircuit,
   onDelete,
   onBack,
@@ -446,23 +448,57 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                   ))}
                 </div>
 
-                <div className="px-5 py-4 border-t border-zinc-100">
+                <div className="px-5 py-4 border-t border-zinc-100 space-y-2">
                   {done ? (
-                    <button
-                      onClick={() => onStartDay(workoutDay)}
-                      className="w-full py-3 bg-zinc-100 text-zinc-600 rounded-2xl font-medium text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all hover:bg-zinc-200"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      Redo Day {workoutDay.day}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onStartDay(workoutDay)}
+                        className="w-full py-3 bg-zinc-100 text-zinc-600 rounded-2xl font-medium text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all hover:bg-zinc-200"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        Redo Day {workoutDay.day}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Unmark Week ${workoutDay.week} Day ${workoutDay.day} as complete?`
+                            )
+                          ) {
+                            onToggleDayComplete(workoutDay.week, workoutDay.day);
+                          }
+                        }}
+                        className="w-full py-2.5 text-xs font-semibold text-zinc-500 hover:text-zinc-700 rounded-xl"
+                      >
+                        Unmark day (not done)
+                      </button>
+                    </>
                   ) : (
-                    <button
-                      onClick={() => onStartDay(workoutDay)}
-                      className="w-full py-3.5 bg-zinc-900 text-white rounded-2xl font-semibold text-sm shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-                    >
-                      <Play className="w-4 h-4 fill-current" />
-                      Start Day {workoutDay.day}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onStartDay(workoutDay)}
+                        disabled={totalExercises === 0}
+                        className="w-full py-3.5 bg-zinc-900 text-white rounded-2xl font-semibold text-sm shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-40 disabled:pointer-events-none"
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                        Start Day {workoutDay.day}
+                      </button>
+                      {totalExercises === 0 && (
+                        <p className="text-[11px] text-amber-700 text-center font-medium">
+                          Add at least one exercise to start this day.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onToggleDayComplete(workoutDay.week, workoutDay.day)}
+                        className="w-full py-2.5 rounded-xl text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-100 hover:bg-sky-100 transition-colors"
+                      >
+                        Mark day complete (without logging a workout)
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

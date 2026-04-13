@@ -51,12 +51,32 @@ function defaultSessionDateStr(): string {
 
 /** Total workout wall clock (header); h:mm:ss or m:ss */
 function formatTotalWorkoutClock(sec: number): string {
-  const s = Math.max(0, Math.floor(sec));
+  const s = Math.max(0, Math.floor(Number.isFinite(sec) ? sec : 0));
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const r = s % 60;
   if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`;
   return `${m}:${r.toString().padStart(2, '0')}`;
+}
+
+function safeDateFromISO(iso: string): Date {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
+function safeDateToISO(d: Date): string {
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+function newSessionId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // ignore
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCancel, history }) => {
@@ -66,7 +86,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   const initial = useMemo(() => {
     const draft = getActiveWorkoutDraft();
     if (draft && activeWorkoutDraftMatches(draft, circuits)) {
-      const clock = new Date(draft.clockISO);
+      const clock = safeDateFromISO(draft.clockISO);
       const workoutStartedAtEpoch =
         typeof draft.workoutStartedAtEpoch === 'number' && draft.workoutStartedAtEpoch > 0
           ? draft.workoutStartedAtEpoch
@@ -99,7 +119,9 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
 
   const workoutStartedAtMsRef = useRef(0);
   if (workoutStartedAtMsRef.current === 0) {
-    workoutStartedAtMsRef.current = initial.workoutStartedAtEpoch;
+    const start = initial.workoutStartedAtEpoch;
+    workoutStartedAtMsRef.current =
+      typeof start === 'number' && Number.isFinite(start) && start > 0 ? start : Date.now();
   }
 
   const [logs, setLogs] = useState<ExerciseLog[]>(() => initial.logs);
@@ -137,18 +159,21 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   }, [circuitKey, logs, sessionDate, sessionClock, swAccumMs, swRunning, swSegmentStart]);
 
   const flushDraftToStorage = useCallback(() => {
-    const s = stateRef.current;
-    const draftClock = s.sessionClock.toISOString();
-    saveActiveWorkoutDraft({
-      circuitKey: s.circuitKey,
-      sessionDate: s.sessionDate,
-      clockISO: draftClock,
-      workoutStartedAtEpoch: workoutStartedAtMsRef.current,
-      logs: s.logs,
-      stopwatchAccumMs: s.swAccumMs,
-      stopwatchRunning: s.swRunning,
-      stopwatchSegmentStartEpoch: s.swSegmentStart,
-    });
+    try {
+      const s = stateRef.current;
+      saveActiveWorkoutDraft({
+        circuitKey: s.circuitKey,
+        sessionDate: s.sessionDate,
+        clockISO: safeDateToISO(s.sessionClock),
+        workoutStartedAtEpoch: workoutStartedAtMsRef.current,
+        logs: s.logs,
+        stopwatchAccumMs: s.swAccumMs,
+        stopwatchRunning: s.swRunning,
+        stopwatchSegmentStartEpoch: s.swSegmentStart,
+      });
+    } catch {
+      // avoid crashing the app if localStorage or date serialization fails
+    }
   }, []);
 
   useEffect(() => {
@@ -182,9 +207,10 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     return () => window.clearInterval(id);
   }, []);
 
+  const startedAt = workoutStartedAtMsRef.current;
   const totalWorkoutSec =
-    totalTick >= 0
-      ? Math.max(0, Math.floor((Date.now() - workoutStartedAtMsRef.current) / 1000))
+    totalTick >= 0 && Number.isFinite(startedAt) && startedAt > 0
+      ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
       : 0;
 
   const restActive = restRemaining !== null && restRemaining > 0;
@@ -247,23 +273,25 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
 
   const handleFinish = () => {
     if (!window.confirm('Finish workout?')) return;
-    const durationSeconds = Math.max(
-      0,
-      Math.floor((Date.now() - workoutStartedAtMsRef.current) / 1000)
-    );
+    const startMs = workoutStartedAtMsRef.current;
+    const durationSeconds =
+      Number.isFinite(startMs) && startMs > 0
+        ? Math.max(0, Math.floor((Date.now() - startMs) / 1000))
+        : 0;
     flushDraftToStorage();
     clearActiveWorkoutDraft();
     const [yr, mo, da] = sessionDate.split('-').map(Number);
+    const sc = Number.isNaN(sessionClock.getTime()) ? new Date() : sessionClock;
     const localDate = new Date(
       yr,
       mo - 1,
       da,
-      sessionClock.getHours(),
-      sessionClock.getMinutes(),
-      sessionClock.getSeconds()
+      sc.getHours(),
+      sc.getMinutes(),
+      sc.getSeconds()
     );
     onFinish({
-      id: crypto.randomUUID(),
+      id: newSessionId(),
       circuitNames: circuits.map(c => c.name),
       date: localDate.toISOString(),
       logs,
@@ -297,6 +325,38 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       .map((log, index) => ({ log, index }))
       .filter(item => item.log.circuitId === c.id),
   }));
+
+  if (circuits.length === 0) {
+    return (
+      <div className="flex flex-col h-screen-dynamic bg-zinc-50 relative overflow-hidden">
+        <div className="bg-zinc-900 px-3 py-3 flex items-center justify-between gap-2 shrink-0 text-white">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="p-2 active:scale-90 transition-transform bg-white/10 rounded-full"
+            aria-label="Back"
+          >
+            <ChevronLeft />
+          </button>
+          <span className="text-xs font-medium text-white/45">Session</span>
+          <span className="w-14" aria-hidden />
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <p className="text-zinc-800 font-semibold">This workout has no exercises.</p>
+          <p className="text-zinc-500 text-sm mt-2 max-w-xs">
+            Add exercises to your program or circuit, then start again.
+          </p>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="mt-8 px-6 py-3 bg-zinc-900 text-white rounded-xl text-sm font-semibold"
+          >
+            Go back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen-dynamic bg-zinc-50 relative overflow-hidden">
