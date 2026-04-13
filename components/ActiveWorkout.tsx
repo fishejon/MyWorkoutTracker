@@ -171,7 +171,8 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     () => initial.stopwatchSegmentStartEpoch
   );
   const [, setSwTick] = useState(0);
-  const [totalTick, setTotalTick] = useState(0);
+  /** Bump-only state so the total-workout clock re-renders every second (value unused on purpose). */
+  const [, setWorkoutClockTick] = useState(0);
 
   const [fabOpen, setFabOpen] = useState(false);
   const [exerciseTimerMode, setExerciseTimerMode] = useState<'stopwatch' | 'countdown'>(
@@ -289,7 +290,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   }, [swRunning]);
 
   useEffect(() => {
-    const id = window.setInterval(() => setTotalTick(t => t + 1), 1000);
+    const id = window.setInterval(() => setWorkoutClockTick(n => n + 1), 1000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -313,7 +314,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
 
   const startedAt = workoutStartedAtMsRef.current;
   const totalWorkoutSec =
-    totalTick >= 0 && Number.isFinite(startedAt) && startedAt > 0
+    Number.isFinite(startedAt) && startedAt > 0
       ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
       : 0;
 
