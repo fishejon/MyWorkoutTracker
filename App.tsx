@@ -786,7 +786,7 @@ const App: React.FC = () => {
   // Special full-height handling for active workout, builder, upload, and program views
   if (view === 'active' || view === 'builder' || view === 'upload' || view === 'program') {
     return (
-      <div className="h-screen-dynamic w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-zinc-50 relative border-x border-zinc-200 overflow-hidden">
+      <div className="h-screen-dynamic min-h-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-zinc-50 relative border-x border-zinc-200 overflow-hidden flex flex-col">
         {renderView()}
       </div>
     );

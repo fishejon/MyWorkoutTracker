@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Circuit, WorkoutSession, ExerciseLog } from '../types';
-import { CheckCircle2, ChevronLeft, Timer, LayoutGrid, SkipForward, Clock } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Timer, LayoutGrid, Clock, ChevronDown } from 'lucide-react';
 import {
   getHistory,
   getLastWorkoutDataForExercise,
@@ -68,6 +69,12 @@ function safeDateToISO(d: Date): string {
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
+function parseCountdownTargetSec(minStr: string, secStr: string): number {
+  const m = Math.max(0, parseInt(minStr, 10) || 0);
+  const s = Math.max(0, Math.min(59, parseInt(secStr, 10) || 0));
+  return Math.max(1, m * 60 + s);
+}
+
 function newSessionId(): string {
   try {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -102,6 +109,12 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         stopwatchAccumMs: draft.stopwatchAccumMs,
         stopwatchRunning: draft.stopwatchRunning,
         stopwatchSegmentStartEpoch: draft.stopwatchSegmentStartEpoch,
+        exerciseTimerMode: draft.exerciseTimerMode === 'countdown' ? 'countdown' as const : 'stopwatch' as const,
+        countdownInputMin: draft.countdownInputMin ?? '1',
+        countdownInputSec: draft.countdownInputSec ?? '0',
+        countdownRemainingSec:
+          typeof draft.countdownRemainingSec === 'number' ? draft.countdownRemainingSec : null,
+        countdownRunning: Boolean(draft.countdownRunning),
       };
     }
     const d = new Date();
@@ -114,6 +127,11 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       stopwatchAccumMs: 0,
       stopwatchRunning: false,
       stopwatchSegmentStartEpoch: null as number | null,
+      exerciseTimerMode: 'stopwatch' as const,
+      countdownInputMin: '1',
+      countdownInputSec: '0',
+      countdownRemainingSec: null as number | null,
+      countdownRunning: false,
     };
   }, [circuits, workoutHistory]);
 
@@ -133,9 +151,16 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     () => initial.stopwatchSegmentStartEpoch
   );
   const [, setSwTick] = useState(0);
-  const [, setTotalTick] = useState(0);
+  const [totalTick, setTotalTick] = useState(0);
 
-  const [restRemaining, setRestRemaining] = useState<number | null>(null);
+  const [fabOpen, setFabOpen] = useState(false);
+  const [exerciseTimerMode, setExerciseTimerMode] = useState<'stopwatch' | 'countdown'>(
+    () => initial.exerciseTimerMode
+  );
+  const [cdInputMin, setCdInputMin] = useState(() => initial.countdownInputMin);
+  const [cdInputSec, setCdInputSec] = useState(() => initial.countdownInputSec);
+  const [cdRemainingSec, setCdRemainingSec] = useState<number | null>(() => initial.countdownRemainingSec);
+  const [cdRunning, setCdRunning] = useState(() => initial.countdownRunning);
 
   const stateRef = useRef({
     circuitKey,
@@ -145,6 +170,11 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     swAccumMs,
     swRunning,
     swSegmentStart,
+    exerciseTimerMode,
+    countdownInputMin: cdInputMin,
+    countdownInputSec: cdInputSec,
+    countdownRemainingSec: cdRemainingSec,
+    countdownRunning: cdRunning,
   });
   useEffect(() => {
     stateRef.current = {
@@ -155,8 +185,26 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       swAccumMs,
       swRunning,
       swSegmentStart,
+      exerciseTimerMode,
+      countdownInputMin: cdInputMin,
+      countdownInputSec: cdInputSec,
+      countdownRemainingSec: cdRemainingSec,
+      countdownRunning: cdRunning,
     };
-  }, [circuitKey, logs, sessionDate, sessionClock, swAccumMs, swRunning, swSegmentStart]);
+  }, [
+    circuitKey,
+    logs,
+    sessionDate,
+    sessionClock,
+    swAccumMs,
+    swRunning,
+    swSegmentStart,
+    exerciseTimerMode,
+    cdInputMin,
+    cdInputSec,
+    cdRemainingSec,
+    cdRunning,
+  ]);
 
   const flushDraftToStorage = useCallback(() => {
     try {
@@ -170,6 +218,11 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         stopwatchAccumMs: s.swAccumMs,
         stopwatchRunning: s.swRunning,
         stopwatchSegmentStartEpoch: s.swSegmentStart,
+        exerciseTimerMode: s.exerciseTimerMode,
+        countdownInputMin: s.countdownInputMin,
+        countdownInputSec: s.countdownInputSec,
+        countdownRemainingSec: s.countdownRemainingSec,
+        countdownRunning: s.countdownRunning,
       });
     } catch {
       // avoid crashing the app if localStorage or date serialization fails
@@ -179,7 +232,20 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   useEffect(() => {
     const t = window.setTimeout(flushDraftToStorage, 400);
     return () => window.clearTimeout(t);
-  }, [logs, sessionDate, swAccumMs, swRunning, swSegmentStart, circuitKey, flushDraftToStorage]);
+  }, [
+    logs,
+    sessionDate,
+    swAccumMs,
+    swRunning,
+    swSegmentStart,
+    circuitKey,
+    exerciseTimerMode,
+    cdInputMin,
+    cdInputSec,
+    cdRemainingSec,
+    cdRunning,
+    flushDraftToStorage,
+  ]);
 
   useEffect(() => {
     const onHide = () => {
@@ -213,45 +279,60 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
       : 0;
 
-  const restActive = restRemaining !== null && restRemaining > 0;
-  useEffect(() => {
-    if (!restActive) return;
-    const id = window.setInterval(() => {
-      setRestRemaining(r => {
-        if (r === null || r <= 1) return 0;
-        return r - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [restActive]);
-
-  useEffect(() => {
-    if (restRemaining !== 0) return;
-    const t = window.setTimeout(() => setRestRemaining(null), 2500);
-    return () => window.clearTimeout(t);
-  }, [restRemaining]);
-
   const stopwatchDisplayMs =
     swRunning && swSegmentStart !== null ? swAccumMs + (Date.now() - swSegmentStart) : swAccumMs;
 
-  const handleStopwatchStart = () => {
-    if (swRunning) return;
-    setSwSegmentStart(Date.now());
-    setSwRunning(true);
+  const handleStopwatchToggle = () => {
+    if (swRunning && swSegmentStart !== null) {
+      setSwAccumMs(a => a + (Date.now() - swSegmentStart));
+      setSwRunning(false);
+      setSwSegmentStart(null);
+    } else {
+      setSwSegmentStart(Date.now());
+      setSwRunning(true);
+    }
   };
 
-  const handleStopwatchStop = () => {
-    if (!swRunning || swSegmentStart === null) return;
-    setSwAccumMs(swAccumMs + (Date.now() - swSegmentStart));
-    setSwRunning(false);
-    setSwSegmentStart(null);
-  };
-
-  const handleStopwatchReset = () => {
+  const handleStopwatchClear = () => {
     setSwAccumMs(0);
     setSwRunning(false);
     setSwSegmentStart(null);
   };
+
+  useEffect(() => {
+    if (!cdRunning) return;
+    const id = window.setInterval(() => {
+      setCdRemainingSec(r => {
+        if (r === null || r <= 1) {
+          window.setTimeout(() => setCdRunning(false), 0);
+          return 0;
+        }
+        return r - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [cdRunning]);
+
+  const handleCountdownToggle = () => {
+    if (cdRunning) {
+      setCdRunning(false);
+      return;
+    }
+    let next = cdRemainingSec;
+    if (next === null || next <= 0) {
+      next = parseCountdownTargetSec(cdInputMin, cdInputSec);
+    }
+    setCdRemainingSec(next);
+    setCdRunning(true);
+  };
+
+  const handleCountdownClear = () => {
+    setCdRunning(false);
+    setCdRemainingSec(null);
+  };
+
+  const countdownDisplaySec =
+    cdRemainingSec !== null ? cdRemainingSec : parseCountdownTargetSec(cdInputMin, cdInputSec);
 
   const updateLog = useCallback((logIdx: number, setIdx: number, field: 'value' | 'weight', val: string | number) => {
     const numVal = typeof val === 'string' ? (val === '' ? 0 : parseFloat(val) || 0) : val;
@@ -313,12 +394,6 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     return `${mins}:${secs.toString().padStart(2, '0')}.${tenths}`;
   };
 
-  const startRest = (seconds: number) => {
-    setRestRemaining(seconds);
-  };
-
-  const skipRest = () => setRestRemaining(null);
-
   const groupedLogs = circuits.map(c => ({
     circuit: c,
     logsWithIndices: logs
@@ -326,9 +401,175 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       .filter(item => item.log.circuitId === c.id),
   }));
 
+  const exerciseTimerPortal =
+    typeof document !== 'undefined'
+      ? createPortal(
+          <>
+            {!fabOpen && (
+              <button
+                type="button"
+                aria-label="Open exercise timer"
+                onClick={() => setFabOpen(true)}
+                className="fixed z-[260] flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 text-white shadow-xl ring-4 ring-white/90 active:scale-95 transition-transform"
+                style={{
+                  right: 'max(1rem, env(safe-area-inset-right, 0px))',
+                  bottom: 'calc(6.75rem + env(safe-area-inset-bottom, 0px))',
+                }}
+              >
+                <Timer className="h-6 w-6 text-sky-400" />
+              </button>
+            )}
+            {fabOpen && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Close timer"
+                  className="fixed inset-0 z-[255] bg-black/40"
+                  onClick={() => setFabOpen(false)}
+                />
+                <div
+                  className="fixed left-1/2 z-[260] w-[min(100vw-1rem,24rem)] -translate-x-1/2 rounded-t-3xl border border-zinc-200 bg-white px-4 pt-2 pb-4 shadow-2xl"
+                  style={{
+                    bottom: 0,
+                    paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+                  }}
+                >
+                  <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-zinc-200" aria-hidden />
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                      Exercise timer
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFabOpen(false)}
+                      className="rounded-full p-2 text-zinc-400 hover:bg-zinc-100"
+                      aria-label="Minimize timer"
+                    >
+                      <ChevronDown className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="mb-4 flex gap-1 rounded-xl bg-zinc-100 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setExerciseTimerMode('stopwatch')}
+                      className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-colors ${
+                        exerciseTimerMode === 'stopwatch'
+                          ? 'bg-white text-zinc-900 shadow-sm'
+                          : 'text-zinc-500'
+                      }`}
+                    >
+                      Stopwatch
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExerciseTimerMode('countdown')}
+                      className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-colors ${
+                        exerciseTimerMode === 'countdown'
+                          ? 'bg-white text-zinc-900 shadow-sm'
+                          : 'text-zinc-500'
+                      }`}
+                    >
+                      Countdown
+                    </button>
+                  </div>
+
+                  {exerciseTimerMode === 'stopwatch' ? (
+                    <div className="space-y-4">
+                      <p className="text-center text-3xl font-bold tabular-nums text-zinc-900">
+                        {formatStopwatch(stopwatchDisplayMs)}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleStopwatchToggle}
+                          className="flex-1 rounded-2xl bg-zinc-900 py-3.5 text-sm font-semibold text-white active:scale-[0.98]"
+                        >
+                          {swRunning ? 'Pause' : 'Start'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleStopwatchClear}
+                          disabled={!swRunning && swAccumMs === 0}
+                          className="rounded-2xl border border-zinc-200 px-5 py-3.5 text-sm font-semibold text-zinc-700 disabled:opacity-35"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <p className="text-center text-[10px] text-zinc-400">
+                        Separate from total workout time at the top of the log.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {!cdRunning && cdRemainingSec === null && (
+                        <div className="flex flex-wrap items-end justify-center gap-2">
+                          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase text-zinc-400">
+                            Min
+                            <input
+                              type="number"
+                              min={0}
+                              inputMode="numeric"
+                              className="w-16 rounded-xl border border-zinc-200 px-2 py-2 text-center text-lg font-bold text-zinc-900 outline-none focus:border-sky-400"
+                              value={cdInputMin}
+                              onChange={e => setCdInputMin(e.target.value)}
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase text-zinc-400">
+                            Sec
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={2}
+                              className="w-16 rounded-xl border border-zinc-200 px-2 py-2 text-center text-lg font-bold text-zinc-900 outline-none focus:border-sky-400"
+                              value={cdInputSec}
+                              onChange={e =>
+                                setCdInputSec(e.target.value.replace(/\D/g, '').slice(0, 2))
+                              }
+                            />
+                          </label>
+                        </div>
+                      )}
+                      <p className="text-center text-3xl font-bold tabular-nums text-zinc-900">
+                        {formatTime(countdownDisplaySec)}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCountdownToggle}
+                          disabled={
+                            !cdRunning &&
+                            cdRemainingSec === null &&
+                            parseCountdownTargetSec(cdInputMin, cdInputSec) < 1
+                          }
+                          className="flex-1 rounded-2xl bg-zinc-900 py-3.5 text-sm font-semibold text-white active:scale-[0.98] disabled:opacity-35"
+                        >
+                          {cdRunning ? 'Pause' : 'Start'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCountdownClear}
+                          disabled={!cdRunning && cdRemainingSec === null}
+                          className="rounded-2xl border border-zinc-200 px-5 py-3.5 text-sm font-semibold text-zinc-700 disabled:opacity-35"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                      <p className="text-center text-[10px] text-zinc-400">
+                        Set any duration (min + sec). Separate from total workout time above.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </>,
+          document.body
+        )
+      : null;
+
   if (circuits.length === 0) {
     return (
-      <div className="flex flex-col h-screen-dynamic bg-zinc-50 relative overflow-hidden">
+      <div className="flex flex-col h-full min-h-0 w-full bg-zinc-50 relative overflow-hidden">
         <div className="bg-zinc-900 px-3 py-3 flex items-center justify-between gap-2 shrink-0 text-white">
           <button
             type="button"
@@ -359,8 +600,8 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   }
 
   return (
-    <div className="flex flex-col h-screen-dynamic bg-zinc-50 relative overflow-hidden">
-      {/* Slim bar: stays put; total duration lives below in scroll so it can scroll away */}
+    <>
+      <div className="flex flex-col h-full min-h-0 w-full bg-zinc-50 relative overflow-hidden">
       <div className="bg-zinc-900 px-3 py-3 flex items-center justify-between gap-2 z-50 text-white shadow-sm shrink-0">
         <button
           onClick={onCancel}
@@ -378,89 +619,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         </button>
       </div>
 
-      {/* Exercise stopwatch + rest — fixed over content while you scroll */}
-      <div
-        className="fixed left-1/2 -translate-x-1/2 z-[100] w-[min(22rem,calc(100vw-1rem))] pointer-events-none"
-        style={{
-          top: 'max(5.25rem, calc(env(safe-area-inset-top, 0px) + 4.5rem))',
-        }}
-      >
-        <div className="rounded-2xl bg-zinc-900/95 text-white shadow-lg border border-white/10 backdrop-blur-md px-3 py-2.5 space-y-2.5 pointer-events-auto">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Timer className="w-4 h-4 text-sky-400 flex-shrink-0" />
-              <p className="text-[9px] font-medium text-white/45 uppercase tracking-wide">Exercise timer</p>
-            </div>
-            <p className="text-xl font-bold tabular-nums leading-tight text-center mb-2">
-              {formatStopwatch(stopwatchDisplayMs)}
-            </p>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={handleStopwatchStart}
-                disabled={swRunning}
-                className="flex-1 py-2 rounded-lg bg-emerald-500/90 hover:bg-emerald-500 text-[11px] font-semibold disabled:opacity-35 disabled:pointer-events-none"
-              >
-                Start
-              </button>
-              <button
-                type="button"
-                onClick={handleStopwatchStop}
-                disabled={!swRunning}
-                className="flex-1 py-2 rounded-lg bg-rose-500/90 hover:bg-rose-500 text-[11px] font-semibold disabled:opacity-35 disabled:pointer-events-none"
-              >
-                Stop
-              </button>
-              <button
-                type="button"
-                onClick={handleStopwatchReset}
-                disabled={!swRunning && swAccumMs === 0}
-                className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-[11px] font-semibold disabled:opacity-35 disabled:pointer-events-none"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-
-          <div className="border-t border-white/10 pt-2">
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-              <p className="text-[9px] font-medium text-white/45 uppercase tracking-wide">Rest</p>
-              {restRemaining !== null && restRemaining > 0 && (
-                <button
-                  type="button"
-                  onClick={skipRest}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-white/10 hover:bg-white/15 text-[10px] font-semibold"
-                >
-                  <SkipForward className="w-3 h-3" />
-                  Skip
-                </button>
-              )}
-            </div>
-            {restRemaining === null || restRemaining === 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {[45, 60, 90, 120].map(sec => (
-                  <button
-                    key={sec}
-                    type="button"
-                    onClick={() => startRest(sec)}
-                    className="flex-1 min-w-[3.25rem] py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-[10px] font-semibold tabular-nums"
-                  >
-                    {sec}s
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-0.5">
-                <p className={`text-xl font-black tabular-nums ${restRemaining === 0 ? 'text-sky-300' : ''}`}>
-                  {restRemaining === 0 ? 'Done' : formatTime(restRemaining)}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 pt-[10.5rem] pb-40 space-y-8">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-4 pb-40 space-y-8">
         {/* Total workout wall clock — top of scroll; scrolls away with the log matrix */}
         <div className="bg-zinc-900 text-white rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 border border-zinc-800 shadow-sm shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -681,7 +840,9 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
           <CheckCircle2 className="w-7 h-7" /> Finish Routine
         </button>
       </div>
-    </div>
+      </div>
+      {exerciseTimerPortal}
+    </>
   );
 };
 

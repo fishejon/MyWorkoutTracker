@@ -64,6 +64,12 @@ export function getActiveWorkoutDraft(): ActiveWorkoutDraft | null {
       stopwatchRunning: Boolean(parsed.stopwatchRunning),
       stopwatchSegmentStartEpoch:
         typeof parsed.stopwatchSegmentStartEpoch === 'number' ? parsed.stopwatchSegmentStartEpoch : null,
+      exerciseTimerMode: parsed.exerciseTimerMode === 'countdown' ? 'countdown' : 'stopwatch',
+      countdownInputMin: typeof parsed.countdownInputMin === 'string' ? parsed.countdownInputMin : '1',
+      countdownInputSec: typeof parsed.countdownInputSec === 'string' ? parsed.countdownInputSec : '0',
+      countdownRemainingSec:
+        typeof parsed.countdownRemainingSec === 'number' ? parsed.countdownRemainingSec : null,
+      countdownRunning: Boolean(parsed.countdownRunning),
     };
   } catch {
     return null;
