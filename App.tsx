@@ -49,12 +49,35 @@ type AuthedUser = {
 
 type AuthStatus = 'checking' | 'unauth' | 'authed';
 
+const dayCompleteKey = (d: { week: number; day: number }) => `${d.week}:${d.day}`;
+
+/** Merge program day completions from localStorage into server programs (fixes lost checkmarks after refresh). */
+function mergeProgramCompletionsFromLocal(
+  server: Program[],
+  local: Program[]
+): { programs: Program[]; hadExtras: boolean } {
+  const localById = new Map(local.map(p => [p.id, p]));
+  let hadExtras = false;
+  const programs = server.map(sp => {
+    const lp = localById.get(sp.id);
+    if (!lp?.completedDays?.length) return sp;
+    const seen = new Set((sp.completedDays ?? []).map(dayCompleteKey));
+    const extras = lp.completedDays.filter(d => !seen.has(dayCompleteKey(d)));
+    if (extras.length === 0) return sp;
+    hadExtras = true;
+    return { ...sp, completedDays: [...(sp.completedDays ?? []), ...extras] };
+  });
+  return { programs, hadExtras };
+}
+
 const App: React.FC = () => {
   const [view, setView] = useState<AppView>('dashboard');
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [customExercises, setCustomExercises] = useState<CustomExercise[]>([]);
   const [activeCircuits, setActiveCircuits] = useState<Circuit[]>([]);
+  /** Bumps on each new active session so ActiveWorkout remounts with fresh state (avoids stale draft/timer refs). */
+  const [activeWorkoutMountId, setActiveWorkoutMountId] = useState(0);
   const [editingCircuit, setEditingCircuit] = useState<Circuit | null>(null);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [viewingProgram, setViewingProgram] = useState<Program | null>(null);
@@ -283,7 +306,16 @@ const App: React.FC = () => {
         saveHistory(nextHistory);
         const nextCustomExercises = serverCustomExercises.length > 0 ? serverCustomExercises : [];
         const localPrograms = getPrograms();
-        const nextPrograms = serverPrograms.length > 0 ? serverPrograms : localPrograms;
+        let nextPrograms: Program[];
+        let programsMergedFromLocal = false;
+        if (serverPrograms.length > 0) {
+          const { programs, hadExtras } = mergeProgramCompletionsFromLocal(serverPrograms, localPrograms);
+          nextPrograms = programs;
+          programsMergedFromLocal = hadExtras;
+          if (hadExtras) savePrograms(nextPrograms);
+        } else {
+          nextPrograms = localPrograms;
+        }
 
         if (!cancelled) {
           setCircuits(nextCircuits);
@@ -293,11 +325,12 @@ const App: React.FC = () => {
           setView('dashboard');
         }
 
-        // Upload if server was empty OR if we merged local-only sessions
+        // Upload if server was empty OR if we merged local-only sessions / program completions
         const needsUpload =
           (serverCircuits.length === 0 && localCircuits.length > 0) ||
           missingSessions.length > 0 ||
-          (serverPrograms.length === 0 && localPrograms.length > 0);
+          (serverPrograms.length === 0 && localPrograms.length > 0) ||
+          programsMergedFromLocal;
         if (needsUpload) {
           await persistUserData(nextCircuits, nextHistory, nextCustomExercises, nextPrograms);
         }
@@ -357,8 +390,32 @@ const App: React.FC = () => {
   };
 
   const handleStartWorkout = (selectedCircuits: Circuit[]) => {
+    if (!selectedCircuits.length) return;
+    setActiveProgramContext(null);
+    setActiveWorkoutMountId(n => n + 1);
     setActiveCircuits(selectedCircuits);
     setView('active');
+  };
+
+  const handleToggleProgramDayComplete = (programId: string, week: number, day: number) => {
+    const updatedPrograms = programs.map(p => {
+      if (p.id !== programId) return p;
+      const existing = p.completedDays ?? [];
+      const already = existing.some(d => d.week === week && d.day === day);
+      if (already) {
+        return {
+          ...p,
+          completedDays: existing.filter(d => !(d.week === week && d.day === day)),
+        };
+      }
+      return { ...p, completedDays: [...existing, { week, day }] };
+    });
+    setPrograms(updatedPrograms);
+    if (viewingProgram?.id === programId) {
+      setViewingProgram(updatedPrograms.find(p => p.id === programId) ?? null);
+    }
+    savePrograms(updatedPrograms);
+    void persistUserData(circuits, history, customExercises, updatedPrograms);
   };
 
   const handleSaveCustomExercise = (ex: CustomExercise) => {
@@ -540,8 +597,26 @@ const App: React.FC = () => {
           />
         );
       case 'active':
-        return activeCircuits.length > 0 ? (
+        if (activeCircuits.length === 0) {
+          return (
+            <div className="flex flex-col h-full bg-zinc-50 items-center justify-center p-8 text-center">
+              <p className="text-zinc-600 text-sm font-medium mb-2">No workout could be loaded.</p>
+              <p className="text-zinc-400 text-xs mb-6">Try starting again from Home or your program.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setView(viewingProgram ? 'program' : 'dashboard');
+                }}
+                className="px-6 py-3 bg-zinc-900 text-white rounded-xl text-sm font-semibold"
+              >
+                Go back
+              </button>
+            </div>
+          );
+        }
+        return (
           <ActiveWorkout
+            key={activeWorkoutMountId}
             circuits={activeCircuits}
             history={history}
             onFinish={handleFinishWorkout}
@@ -551,7 +626,7 @@ const App: React.FC = () => {
               setView(viewingProgram ? 'program' : 'dashboard');
             }}
           />
-        ) : null;
+        );
       case 'history':
         return <HistoryView history={history} onDelete={handleDeleteSession} />;
       case 'stats':
@@ -587,10 +662,15 @@ const App: React.FC = () => {
             onSaveCustomExercise={handleSaveCustomExercise}
             onPatchCircuit={handlePatchProgramCircuit}
             onStartDay={(workoutDay) => {
+              if (!workoutDay.circuits.length) return;
+              setActiveWorkoutMountId(n => n + 1);
               setActiveCircuits(workoutDay.circuits);
               setActiveProgramContext({ programId: viewingProgram.id, week: workoutDay.week, day: workoutDay.day });
               setView('active');
             }}
+            onToggleDayComplete={(week, day) =>
+              handleToggleProgramDayComplete(viewingProgram.id, week, day)
+            }
             onEditCircuit={(circuit, week, day, circuitIdx) => {
               setEditingProgramCircuit({ programId: viewingProgram.id, week, day, circuitIdx, circuit });
             }}
