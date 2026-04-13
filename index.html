@@ -18,17 +18,35 @@
       --sab: env(safe-area-inset-bottom);
       --sal: env(safe-area-inset-left);
     }
+    html {
+      height: 100%;
+      height: -webkit-fill-available;
+    }
     body {
       font-family: 'Inter', sans-serif;
       background-color: #f8fafc;
       -webkit-tap-highlight-color: transparent;
       overscroll-behavior-y: none;
+      min-height: 100%;
+      min-height: -webkit-fill-available;
+      height: 100vh;
       height: 100dvh;
       overflow: hidden;
     }
     .safe-top { padding-top: var(--sat); }
     .safe-bottom { padding-bottom: var(--sab); }
-    .h-screen-dynamic { height: 100dvh; }
+    /* Fill the viewport; avoid max-height:100dvh here — on some iOS versions it fights min-height
+       and can collapse the active-workout shell to zero visible content. */
+    .h-screen-dynamic {
+      height: 100%;
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+    #root {
+      height: 100%;
+      min-height: 100%;
+      min-height: -webkit-fill-available;
+    }
 
     /* Smooth custom scrollbar for mobile */
     ::-webkit-scrollbar {

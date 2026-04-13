@@ -69,6 +69,13 @@ export interface ActiveWorkoutDraft {
   stopwatchRunning: boolean;
   /** Epoch ms when the current stopwatch segment started, if running */
   stopwatchSegmentStartEpoch: number | null;
+  /** Exercise FAB: stopwatch vs custom countdown */
+  exerciseTimerMode?: 'stopwatch' | 'countdown';
+  countdownInputMin?: string;
+  countdownInputSec?: string;
+  /** null = show target from inputs; number = paused or live remaining */
+  countdownRemainingSec?: number | null;
+  countdownRunning?: boolean;
 }
 
 export type AppView = 'dashboard' | 'builder' | 'active' | 'history' | 'stats' | 'upload' | 'program';

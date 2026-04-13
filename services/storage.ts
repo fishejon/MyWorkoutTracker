@@ -27,6 +27,12 @@ export function activeWorkoutCircuitKey(circuits: Circuit[]): string {
   return [...circuits.map(c => c.id)].sort().join('|');
 }
 
+function draftSetLooksValid(s: unknown): boolean {
+  if (typeof s !== 'object' || s === null) return false;
+  const o = s as { setIndex?: unknown; value?: unknown };
+  return typeof o.setIndex === 'number' && typeof o.value === 'number';
+}
+
 export function activeWorkoutDraftMatches(draft: ActiveWorkoutDraft, circuits: Circuit[]): boolean {
   if (draft.circuitKey !== activeWorkoutCircuitKey(circuits)) return false;
   const expectedIds: string[] = [];
@@ -34,7 +40,11 @@ export function activeWorkoutDraftMatches(draft: ActiveWorkoutDraft, circuits: C
     for (const ex of c.exercises) expectedIds.push(ex.id);
   }
   if (!Array.isArray(draft.logs) || draft.logs.length !== expectedIds.length) return false;
-  return draft.logs.every((log, i) => log && log.exerciseId === expectedIds[i]);
+  return draft.logs.every((log, i) => {
+    if (!log || typeof log !== 'object' || log.exerciseId !== expectedIds[i]) return false;
+    if (!Array.isArray(log.sets) || log.sets.length === 0) return false;
+    return log.sets.every(draftSetLooksValid);
+  });
 }
 
 export function getActiveWorkoutDraft(): ActiveWorkoutDraft | null {
@@ -64,6 +74,12 @@ export function getActiveWorkoutDraft(): ActiveWorkoutDraft | null {
       stopwatchRunning: Boolean(parsed.stopwatchRunning),
       stopwatchSegmentStartEpoch:
         typeof parsed.stopwatchSegmentStartEpoch === 'number' ? parsed.stopwatchSegmentStartEpoch : null,
+      exerciseTimerMode: parsed.exerciseTimerMode === 'countdown' ? 'countdown' : 'stopwatch',
+      countdownInputMin: typeof parsed.countdownInputMin === 'string' ? parsed.countdownInputMin : '1',
+      countdownInputSec: typeof parsed.countdownInputSec === 'string' ? parsed.countdownInputSec : '0',
+      countdownRemainingSec:
+        typeof parsed.countdownRemainingSec === 'number' ? parsed.countdownRemainingSec : null,
+      countdownRunning: Boolean(parsed.countdownRunning),
     };
   } catch {
     return null;

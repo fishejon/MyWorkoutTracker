@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { WorkoutSession } from '../types';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { TrendingUp, Award } from 'lucide-react';
+import { DebugLogCopyBanner } from './DebugLogCopyBanner';
 
 interface StatsViewProps { history: WorkoutSession[]; }
 
@@ -67,6 +68,7 @@ const StatsView: React.FC<StatsViewProps> = ({ history }) => {
         <TrendingUp className="text-zinc-300 w-10 h-10 mb-4" />
         <h3 className="font-semibold text-zinc-800">No data yet</h3>
         <p className="text-zinc-400 text-sm mt-1">Complete workouts to track your progress.</p>
+        <DebugLogCopyBanner />
       </div>
     );
   }
@@ -145,6 +147,7 @@ const StatsView: React.FC<StatsViewProps> = ({ history }) => {
           )}
         </div>
       )}
+      <DebugLogCopyBanner />
     </div>
   );
 };
