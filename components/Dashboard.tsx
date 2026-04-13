@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Circuit, WorkoutSession, Program } from '../types';
+import { DebugLogCopyBanner } from './DebugLogCopyBanner';
 import {
   Play, Trash2, PlusCircle, Pencil, Check, Upload,
   BookOpen, ChevronLeft, ChevronRight, Flame, Clock, ChevronDown,
@@ -440,6 +441,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       )}
+
+      <DebugLogCopyBanner />
 
       <div className="h-4" />
     </div>

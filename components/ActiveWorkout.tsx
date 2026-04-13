@@ -11,6 +11,7 @@ import {
   activeWorkoutDraftMatches,
   activeWorkoutCircuitKey,
 } from '../services/storage';
+import { debugSessionLog } from '../utils/debugSessionLog';
 
 interface ActiveWorkoutProps {
   circuits: Circuit[];
@@ -92,7 +93,21 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
 
   const initial = useMemo(() => {
     const draft = getActiveWorkoutDraft();
-    if (draft && activeWorkoutDraftMatches(draft, circuits)) {
+    const draftMatches = Boolean(draft && activeWorkoutDraftMatches(draft, circuits));
+    // #region agent log
+    debugSessionLog('H3', 'ActiveWorkout:useMemo(initial)', 'draft_check', {
+      hasDraft: Boolean(draft),
+      draftMatches,
+      circuitCount: circuits.length,
+      draftLogLen: draft?.logs?.length,
+    });
+    // #endregion
+    if (draftMatches && draft) {
+      // #region agent log
+      debugSessionLog('H3', 'ActiveWorkout:useMemo(initial)', 'branch_restore_draft', {
+        logsLen: draft.logs.length,
+      });
+      // #endregion
       const clock = safeDateFromISO(draft.clockISO);
       const workoutStartedAtEpoch =
         typeof draft.workoutStartedAtEpoch === 'number' && draft.workoutStartedAtEpoch > 0
@@ -117,6 +132,11 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         countdownRunning: Boolean(draft.countdownRunning),
       };
     }
+    // #region agent log
+    debugSessionLog('H3', 'ActiveWorkout:useMemo(initial)', 'branch_fresh_logs', {
+      circuitCount: circuits.length,
+    });
+    // #endregion
     const d = new Date();
     const now = Date.now();
     return {
@@ -271,6 +291,24 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   useEffect(() => {
     const id = window.setInterval(() => setTotalTick(t => t + 1), 1000);
     return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    // #region agent log
+    debugSessionLog('H3', 'ActiveWorkout:useEffect', 'mounted_ok', {
+      logsLen: logs.length,
+      circuitKey,
+    });
+    // #endregion
+  }, []);
+
+  useEffect(() => {
+    // #region agent log
+    debugSessionLog('H4', 'ActiveWorkout:useEffect', 'dom_portal', {
+      hasDocument: typeof document !== 'undefined',
+      hasBody: typeof document !== 'undefined' && !!document.body,
+    });
+    // #endregion
   }, []);
 
   const startedAt = workoutStartedAtMsRef.current;
