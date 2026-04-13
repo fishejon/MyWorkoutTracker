@@ -25,6 +25,7 @@ import HistoryView from './components/HistoryView';
 import StatsView from './components/StatsView';
 import ProgramUpload from './components/ProgramUpload';
 import ProgramView from './components/ProgramView';
+import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 
 const ID_TOKEN_STORAGE_KEY = 'mwt_google_id_token';
 
@@ -783,11 +784,24 @@ const App: React.FC = () => {
     );
   }
 
+  const handleFullScreenViewError = () => {
+    setActiveCircuits([]);
+    setActiveProgramContext(null);
+    setEditingCircuit(null);
+    setEditingProgramCircuit(null);
+    setViewingProgram(null);
+    setView('dashboard');
+  };
+
   // Special full-height handling for active workout, builder, upload, and program views
   if (view === 'active' || view === 'builder' || view === 'upload' || view === 'program') {
     return (
       <div className="h-screen-dynamic min-h-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-zinc-50 relative border-x border-zinc-200 overflow-hidden flex flex-col">
-        {renderView()}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <ViewErrorBoundary key={view} onReset={handleFullScreenViewError}>
+            {renderView()}
+          </ViewErrorBoundary>
+        </div>
       </div>
     );
   }

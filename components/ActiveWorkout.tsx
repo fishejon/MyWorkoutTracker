@@ -341,7 +341,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       const newLogs = [...prev];
       if (!newLogs[logIdx]) return prev;
       const log = { ...newLogs[logIdx] };
-      const sets = [...log.sets];
+      const sets = [...(log.sets ?? [])];
       const set = { ...sets[setIdx] };
       if (field === 'value') set.value = numVal;
       if (field === 'weight') set.weight = numVal;
@@ -656,7 +656,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         </div>
 
         {groupedLogs.map(({ circuit, logsWithIndices }) => {
-          const maxSets = Math.max(...logsWithIndices.map(({ log }) => log.sets.length), 1);
+          const maxSets = Math.max(...logsWithIndices.map(({ log }) => log.sets?.length ?? 0), 1);
           const setIndices = Array.from({ length: maxSets }, (_, i) => i);
           const hasWeightEx = logsWithIndices.some(({ log }) => log.type === 'weight');
 
@@ -730,7 +730,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
                           </td>
 
                           {setIndices.map(si => {
-                            const set = log.sets[si];
+                            const set = (log.sets ?? [])[si];
                             const lastSet = log.lastWorkoutSets?.[si];
 
                             if (!set) {
