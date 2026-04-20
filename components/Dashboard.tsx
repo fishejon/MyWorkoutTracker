@@ -1,11 +1,12 @@
 
 import React, { useMemo, useState } from 'react';
 import { Circuit, WorkoutSession, Program } from '../types';
-import { DebugLogCopyBanner } from './DebugLogCopyBanner';
 import {
   Play, Trash2, PlusCircle, Pencil, Check, Upload,
   BookOpen, ChevronLeft, ChevronRight, Flame, Clock, ChevronDown,
 } from 'lucide-react';
+
+export type DashboardTourSection = 'today' | 'calendar' | 'stats' | 'programs' | 'circuits';
 
 interface DashboardProps {
   circuits: Circuit[];
@@ -18,6 +19,10 @@ interface DashboardProps {
   onNew: () => void;
   onImportCSV: () => void;
   onOpenProgram: (program: Program) => void;
+  /** When true, sections get stable `id`s for the marketing landing scroll tour. */
+  tourIds?: boolean;
+  /** Visually emphasize a section (used with `tourIds` on the landing page). */
+  highlightTour?: DashboardTourSection | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -129,9 +134,14 @@ const WorkoutCalendar: React.FC<{ history: WorkoutSession[] }> = ({ history }) =
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
+const tourSectionClass = (active: boolean) =>
+  `rounded-2xl transition-[box-shadow,ring] duration-500 ${
+    active ? 'ring-2 ring-sky-500 ring-offset-2 ring-offset-zinc-50 shadow-xl relative z-[1]' : ''
+  }`;
+
 const Dashboard: React.FC<DashboardProps> = ({
   circuits, history, programs, onStart, onDelete, onDeleteProgram,
-  onEdit, onNew, onImportCSV, onOpenProgram,
+  onEdit, onNew, onImportCSV, onOpenProgram, tourIds, highlightTour,
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -189,7 +199,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     <div className="p-4 space-y-5">
 
       {/* Today Card */}
-      <div className="bg-zinc-900 text-white rounded-2xl p-5">
+      <div
+        id={tourIds ? 'landing-tour-today' : undefined}
+        className={`bg-zinc-900 text-white rounded-2xl p-5 ${tourSectionClass(highlightTour === 'today')}`}
+      >
         <div className="flex items-start justify-between mb-4">
           <div>
             <p className="text-xs text-white/50 font-medium mb-0.5">
@@ -233,10 +246,18 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Calendar */}
-      <WorkoutCalendar history={history} />
+      <div
+        id={tourIds ? 'landing-tour-calendar' : undefined}
+        className={tourSectionClass(highlightTour === 'calendar')}
+      >
+        <WorkoutCalendar history={history} />
+      </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div
+        id={tourIds ? 'landing-tour-stats' : undefined}
+        className={`grid grid-cols-2 gap-3 ${tourSectionClass(highlightTour === 'stats')}`}
+      >
         <div className="bg-white rounded-2xl p-4 border border-zinc-200">
           <span className="block text-xs text-zinc-500 font-medium mb-1">Total workouts</span>
           <span className="text-2xl font-bold text-zinc-900">{history.length}</span>
@@ -248,7 +269,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Programs */}
-      <div className="space-y-3">
+      <div
+        id={tourIds ? 'landing-tour-programs' : undefined}
+        className={`space-y-3 ${tourSectionClass(highlightTour === 'programs')}`}
+      >
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-semibold text-zinc-800">Programs</h3>
           <button onClick={onImportCSV} className="text-sky-500 text-xs font-medium flex items-center gap-1">
@@ -304,7 +328,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* My Circuits */}
-      <div className="space-y-3">
+      <div
+        id={tourIds ? 'landing-tour-circuits' : undefined}
+        className={`space-y-3 ${tourSectionClass(highlightTour === 'circuits')}`}
+      >
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-semibold text-zinc-800">My Circuits</h3>
           <button onClick={onNew} className="text-sky-500 text-xs font-medium flex items-center gap-1">
@@ -441,8 +468,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           </button>
         </div>
       )}
-
-      <DebugLogCopyBanner />
 
       <div className="h-4" />
     </div>

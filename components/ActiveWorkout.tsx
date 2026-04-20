@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Circuit, WorkoutSession, ExerciseLog } from '../types';
-import { CheckCircle2, ChevronLeft, Timer, LayoutGrid, Clock, ChevronDown } from 'lucide-react';
+import { Circuit, WorkoutSession, ExerciseLog, CustomExercise } from '../types';
+import { CheckCircle2, ChevronLeft, Timer, LayoutGrid, Clock, ChevronDown, Pencil } from 'lucide-react';
 import {
   getHistory,
   getLastWorkoutDataForExercise,
@@ -11,13 +11,20 @@ import {
   activeWorkoutDraftMatches,
   activeWorkoutCircuitKey,
 } from '../services/storage';
-import { debugSessionLog } from '../utils/debugSessionLog';
+import { reconcileLogsWithCircuits } from '../services/activeWorkoutLogReconcile';
+import ActiveWorkoutRoutineEditor from './ActiveWorkoutRoutineEditor';
 
 interface ActiveWorkoutProps {
   circuits: Circuit[];
   onFinish: (session: WorkoutSession) => void;
   onCancel: () => void;
   history?: WorkoutSession[];
+  /** User's saved circuits — for adding to the session mid-workout. */
+  libraryCircuits: Circuit[];
+  onCircuitsChange: (next: Circuit[]) => void;
+  customExercises: CustomExercise[];
+  existingCategories: string[];
+  onSaveCustomExercise: (ex: CustomExercise) => void;
 }
 
 function buildFreshLogs(circuits: Circuit[], workoutHistory: WorkoutSession[]): ExerciseLog[] {
@@ -87,27 +94,33 @@ function newSessionId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
-const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCancel, history }) => {
+function serializeCircuitsSyncSignature(c: Circuit[]): string {
+  return JSON.stringify(
+    c.map(x => ({
+      id: x.id,
+      ex: x.exercises.map(e => ({ id: e.id, sets: e.sets, type: e.type })),
+    }))
+  );
+}
+
+const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
+  circuits,
+  onFinish,
+  onCancel,
+  history,
+  libraryCircuits,
+  onCircuitsChange,
+  customExercises,
+  existingCategories,
+  onSaveCustomExercise,
+}) => {
   const workoutHistory = history ?? getHistory();
   const circuitKey = useMemo(() => activeWorkoutCircuitKey(circuits), [circuits]);
 
   const initial = useMemo(() => {
     const draft = getActiveWorkoutDraft();
     const draftMatches = Boolean(draft && activeWorkoutDraftMatches(draft, circuits));
-    // #region agent log
-    debugSessionLog('H3', 'ActiveWorkout:useMemo(initial)', 'draft_check', {
-      hasDraft: Boolean(draft),
-      draftMatches,
-      circuitCount: circuits.length,
-      draftLogLen: draft?.logs?.length,
-    });
-    // #endregion
     if (draftMatches && draft) {
-      // #region agent log
-      debugSessionLog('H3', 'ActiveWorkout:useMemo(initial)', 'branch_restore_draft', {
-        logsLen: draft.logs.length,
-      });
-      // #endregion
       const clock = safeDateFromISO(draft.clockISO);
       const workoutStartedAtEpoch =
         typeof draft.workoutStartedAtEpoch === 'number' && draft.workoutStartedAtEpoch > 0
@@ -132,11 +145,6 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
         countdownRunning: Boolean(draft.countdownRunning),
       };
     }
-    // #region agent log
-    debugSessionLog('H3', 'ActiveWorkout:useMemo(initial)', 'branch_fresh_logs', {
-      circuitCount: circuits.length,
-    });
-    // #endregion
     const d = new Date();
     const now = Date.now();
     return {
@@ -175,6 +183,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
   const [, setWorkoutClockTick] = useState(0);
 
   const [fabOpen, setFabOpen] = useState(false);
+  const [routineEditorOpen, setRoutineEditorOpen] = useState(false);
   const [exerciseTimerMode, setExerciseTimerMode] = useState<'stopwatch' | 'countdown'>(
     () => initial.exerciseTimerMode
   );
@@ -294,23 +303,22 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
     return () => window.clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    // #region agent log
-    debugSessionLog('H3', 'ActiveWorkout:useEffect', 'mounted_ok', {
-      logsLen: logs.length,
-      circuitKey,
-    });
-    // #endregion
-  }, []);
+  const workoutHistoryRef = useRef(workoutHistory);
+  workoutHistoryRef.current = workoutHistory;
+  const circuitsSyncSigRef = useRef<string>('');
+  const isInitialCircuitsSync = useRef(true);
 
   useEffect(() => {
-    // #region agent log
-    debugSessionLog('H4', 'ActiveWorkout:useEffect', 'dom_portal', {
-      hasDocument: typeof document !== 'undefined',
-      hasBody: typeof document !== 'undefined' && !!document.body,
-    });
-    // #endregion
-  }, []);
+    const sig = serializeCircuitsSyncSignature(circuits);
+    if (isInitialCircuitsSync.current) {
+      isInitialCircuitsSync.current = false;
+      circuitsSyncSigRef.current = sig;
+      return;
+    }
+    if (sig === circuitsSyncSigRef.current) return;
+    circuitsSyncSigRef.current = sig;
+    setLogs(prev => reconcileLogsWithCircuits(prev, circuits, workoutHistoryRef.current));
+  }, [circuits]);
 
   const startedAt = workoutStartedAtMsRef.current;
   const totalWorkoutSec =
@@ -674,24 +682,34 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-zinc-200 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-zinc-100 rounded-xl">
+        <div className="bg-white p-4 rounded-2xl border border-zinc-200 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 bg-zinc-100 rounded-xl flex-shrink-0">
               <LayoutGrid className="w-5 h-5 text-zinc-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-zinc-400 font-medium">Routine</p>
               <p className="text-sm font-semibold text-zinc-900">
                 {circuits.length} Circuit{circuits.length !== 1 ? 's' : ''} · {logs.length} Exercises
               </p>
             </div>
           </div>
-          <input
-            type="date"
-            className="text-xs font-medium text-zinc-600 bg-zinc-50 px-3 py-2 rounded-xl border border-zinc-200 outline-none focus:border-sky-400"
-            value={sessionDate}
-            onChange={e => setSessionDate(e.target.value)}
-          />
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setRoutineEditorOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-100 px-3 py-1.5 rounded-xl transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit routine
+            </button>
+            <input
+              type="date"
+              className="text-xs font-medium text-zinc-600 bg-zinc-50 px-3 py-2 rounded-xl border border-zinc-200 outline-none focus:border-sky-400"
+              value={sessionDate}
+              onChange={e => setSessionDate(e.target.value)}
+            />
+          </div>
         </div>
 
         {groupedLogs.map(({ circuit, logsWithIndices }) => {
@@ -881,6 +899,18 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({ circuits, onFinish, onCan
       </div>
       </div>
       {exerciseTimerPortal}
+      <ActiveWorkoutRoutineEditor
+        open={routineEditorOpen}
+        onClose={() => setRoutineEditorOpen(false)}
+        circuits={circuits}
+        libraryCircuits={libraryCircuits}
+        onCommit={next => {
+          onCircuitsChange(next);
+        }}
+        customExercises={customExercises}
+        existingCategories={existingCategories}
+        onSaveCustomExercise={onSaveCustomExercise}
+      />
     </>
   );
 };

@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { WorkoutSession, ExerciseLog } from '../types';
 import { Calendar, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
-import { DebugLogCopyBanner } from './DebugLogCopyBanner';
 
 interface HistoryViewProps {
   history: WorkoutSession[];
@@ -36,7 +35,6 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete }) => {
         </div>
         <h3 className="font-semibold text-zinc-800">No workouts logged yet</h3>
         <p className="text-zinc-400 text-sm mt-1">Finish a workout to see it here.</p>
-        <DebugLogCopyBanner />
       </div>
     );
   }
@@ -146,7 +144,6 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete }) => {
           </div>
         );
       })}
-      <DebugLogCopyBanner />
     </div>
   );
 };

@@ -1,5 +1,4 @@
 import React from 'react';
-import { debugSessionLog } from '../utils/debugSessionLog';
 
 type Props = {
   children: React.ReactNode;
@@ -21,12 +20,6 @@ export class ViewErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(err: unknown, info: React.ErrorInfo): void {
-    // #region agent log
-    debugSessionLog('H5', 'ViewErrorBoundary:componentDidCatch', err instanceof Error ? err.message : String(err), {
-      stack: err instanceof Error ? String(err.stack).slice(0, 900) : '',
-      componentStack: (info.componentStack || '').slice(0, 600),
-    });
-    // #endregion
     console.error('[ViewErrorBoundary]', err, info.componentStack);
   }
 
