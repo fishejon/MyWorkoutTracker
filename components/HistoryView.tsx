@@ -107,7 +107,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete }) => {
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-xs font-semibold text-zinc-800">{log.exerciseName}</span>
                               <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-md ${
-                                log.type === 'weight' ? 'bg-sky-100 text-sky-600' :
+                                log.type === 'weight' ? 'bg-blue-100 text-blue-700' :
                                 log.type === 'reps'   ? 'bg-zinc-200 text-zinc-600' :
                                                        'bg-amber-100 text-amber-600'
                               }`}>
@@ -126,7 +126,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onDelete }) => {
                                 return (
                                   <div key={si} className="flex items-center gap-1">
                                     <span className="text-[9px] text-zinc-400 font-medium">S{si + 1}</span>
-                                    <span className="text-xs font-semibold text-zinc-700 bg-white border border-zinc-200 rounded-lg px-2 py-0.5">
+                                    <span className="font-numeric text-xs font-semibold text-zinc-700 bg-white border border-zinc-200 rounded-lg px-2 py-0.5">
                                       {label}
                                     </span>
                                   </div>

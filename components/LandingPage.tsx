@@ -14,6 +14,7 @@ import {
   Plus,
   Sparkles,
   Trash2,
+  Download,
 } from 'lucide-react';
 import Dashboard, { DashboardTourSection } from './Dashboard';
 import { LANDING_DEMO_CIRCUITS, LANDING_DEMO_HISTORY, LANDING_DEMO_PROGRAM } from '../data/landingDemo';
@@ -25,27 +26,27 @@ const TOUR_ORDER: LandingTourId[] = ['today', 'calendar', 'stats', 'programs', '
 const TOUR_COPY: Record<LandingTourId, { title: string; body: string }> = {
   today: {
     title: 'Your day at a glance',
-    body: 'See today’s date, streaks when you’re on a roll, your last session, and jump back in with Start Again when it fits.',
+    body: 'Date, streak, last session. One tap to start again.',
   },
   calendar: {
     title: 'Workout calendar',
-    body: 'Flip through months. Days you trained light up so you can spot consistency and gaps at a glance.',
+    body: 'Your month at a glance. Gaps don’t lie.',
   },
   stats: {
     title: 'Quick totals',
-    body: 'Total workouts and how many you logged this month — lightweight stats right next to your calendar.',
+    body: 'Total sessions and this month’s count.',
   },
   programs: {
     title: 'Programs from CSV',
-    body: 'Import structured plans (single day or multi-week), open a program to work a day, and remove plans you no longer need.',
+    body: 'Import a CSV. Work day by day. Mark it done.',
   },
   circuits: {
     title: 'Custom circuits',
-    body: 'Group circuits by category, tap to multi-select, edit or delete in place, then start a session from your picks.',
+    body: 'Build circuits. Multi-select to start. Edit inline.',
   },
   'program-detail': {
     title: 'Inside a program',
-    body: 'Start any day, mark completion, pull circuits from your library, and edit exercises — without leaving the flow.',
+    body: 'Start a day, mark it done, edit circuits - all in one place.',
   },
 };
 
@@ -136,35 +137,18 @@ const LandingPage: React.FC<LandingPageProps> = ({
           <div className="space-y-4 max-w-xl">
             <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 text-sky-800 text-xs font-semibold px-3 py-1 border border-sky-100">
               <Sparkles className="w-3.5 h-3.5" />
-              Train with clarity
+              No subscription. No noise.
             </div>
             <h1 className="text-3xl md:text-4xl font-black tracking-tight italic">
-              MyWorkoutTracker
+              Log your workouts. See the work add up.
             </h1>
             <p className="text-zinc-600 text-base leading-relaxed">
-              A focused home for logging sessions, building circuits, importing CSV programs, and seeing
-              how often you actually show up — without turning training into spreadsheet work.
+              Track sessions, programs, and consistency in one clean place.
             </p>
-            <ul className="text-sm text-zinc-600 space-y-2">
-              <li className="flex gap-2">
-                <span className="text-sky-500 font-bold">·</span>
-                Calendar + streaks so you can see the week you had, not just the last set.
-              </li>
-              <li className="flex gap-2">
-                <span className="text-sky-500 font-bold">·</span>
-                Custom circuits with categories, multi-select starts, and in-row edit/delete.
-              </li>
-              <li className="flex gap-2">
-                <span className="text-sky-500 font-bold">·</span>
-                Multi-week programs from CSV, with per-day completion as you finish work.
-              </li>
-            </ul>
           </div>
           <div className="w-full max-w-sm bg-zinc-900 text-white rounded-2xl p-5 shadow-xl border border-zinc-800">
             <p className="text-xs text-white/60 font-medium mb-3">Ready when you are</p>
-            <p className="text-sm text-white/80 mb-4">
-              Sign in with Google to sync your data. Your Gemini key stays server-side; we only verify a Google ID token.
-            </p>
+            <p className="text-sm text-white/80 mb-4">Sign in to sync your workouts.</p>
             {authError && (
               <div className="text-left text-xs bg-amber-500/15 border border-amber-400/40 text-amber-50 rounded-xl p-3 mb-4 whitespace-pre-wrap">
                 {authError}
@@ -194,10 +178,9 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
       <main className="max-w-5xl mx-auto px-4 py-10 md:py-14 space-y-10">
         <section className="space-y-2">
-          <h2 className="text-lg font-bold text-zinc-900">Scroll the real home layout</h2>
+          <h2 className="text-lg font-bold text-zinc-900">See your training home in action</h2>
           <p className="text-sm text-zinc-600 max-w-2xl">
-            The preview below uses sample workouts so you can see exactly how the dashboard is structured.
-            As each part reaches the middle of your screen, we call out what it does — the same sections you will use after sign-in.
+            A live preview with sample data shows the same sections you will use once you sign in.
           </p>
         </section>
 
@@ -379,12 +362,37 @@ const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </section>
 
-        <section className="rounded-3xl border border-dashed border-sky-200 bg-sky-50/40 p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div className="space-y-2">
-            <h2 className="text-lg font-bold text-zinc-900">Start with your own data</h2>
+        <section className="rounded-3xl border border-dashed border-sky-200 bg-sky-50/40 p-6 md:p-8 flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+          <div className="space-y-3">
+            <h2 className="text-lg font-bold text-zinc-900">Ready to track for real?</h2>
             <p className="text-sm text-zinc-600 max-w-xl">
-              When you are ready, sign in and the preview switches to your workouts, programs, and circuits. Nothing here is saved — it is only a guided tour.
+              Sign in to save your workouts, then download the CSV template to build your next program block.
             </p>
+            <div className="rounded-2xl border border-sky-100 bg-white/80 p-4 max-w-xl">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700 mb-2">Program builder preview</p>
+              <div className="space-y-2 text-xs text-zinc-600">
+                <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                  <span className="font-medium text-zinc-800">Week 1 · Day 1</span>
+                  <span className="text-zinc-400">Upper Body A</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                  <span className="font-medium text-zinc-800">Week 1 · Day 2</span>
+                  <span className="text-zinc-400">Lower Body A</span>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2">
+                  <span className="font-medium text-zinc-800">Week 2 · Day 1</span>
+                  <span className="text-zinc-400">Upper Body B</span>
+                </div>
+              </div>
+            </div>
+            <a
+              href="/program-template.csv"
+              download
+              className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-white px-4 py-2 text-sm font-semibold text-sky-700 hover:text-sky-800 hover:border-sky-300 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download the program CSV template
+            </a>
           </div>
           <div className="flex-shrink-0 w-full max-w-xs mx-auto md:mx-0">
             {authStatus === 'checking' ? (

@@ -463,7 +463,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                   bottom: 'calc(6.75rem + env(safe-area-inset-bottom, 0px))',
                 }}
               >
-                <Timer className="h-6 w-6 text-sky-400" />
+                <Timer className="h-6 w-6 text-blue-500" />
               </button>
             )}
             {fabOpen && (
@@ -522,7 +522,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
 
                   {exerciseTimerMode === 'stopwatch' ? (
                     <div className="space-y-4">
-                      <p className="text-center text-3xl font-bold tabular-nums text-zinc-900">
+                      <p className="font-numeric text-center text-3xl font-bold tabular-nums text-zinc-900">
                         {formatStopwatch(stopwatchDisplayMs)}
                       </p>
                       <div className="flex gap-2">
@@ -556,7 +556,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                               type="number"
                               min={0}
                               inputMode="numeric"
-                              className="w-16 rounded-xl border border-zinc-200 px-2 py-2 text-center text-lg font-bold text-zinc-900 outline-none focus:border-sky-400"
+                              className="font-numeric w-16 rounded-xl border border-zinc-200 px-2 py-2 text-center text-lg font-bold text-zinc-900 outline-none focus:border-blue-600"
                               value={cdInputMin}
                               onChange={e => setCdInputMin(e.target.value)}
                             />
@@ -567,7 +567,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                               type="text"
                               inputMode="numeric"
                               maxLength={2}
-                              className="w-16 rounded-xl border border-zinc-200 px-2 py-2 text-center text-lg font-bold text-zinc-900 outline-none focus:border-sky-400"
+                              className="font-numeric w-16 rounded-xl border border-zinc-200 px-2 py-2 text-center text-lg font-bold text-zinc-900 outline-none focus:border-blue-600"
                               value={cdInputSec}
                               onChange={e =>
                                 setCdInputSec(e.target.value.replace(/\D/g, '').slice(0, 2))
@@ -576,7 +576,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                           </label>
                         </div>
                       )}
-                      <p className="text-center text-3xl font-bold tabular-nums text-zinc-900">
+                      <p className="font-numeric text-center text-3xl font-bold tabular-nums text-zinc-900">
                         {formatTime(countdownDisplaySec)}
                       </p>
                       <div className="flex gap-2">
@@ -671,11 +671,11 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
         <div className="bg-zinc-900 text-white rounded-2xl px-4 py-3.5 flex items-center justify-between gap-3 border border-zinc-800 shadow-sm shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-2 rounded-xl bg-white/10 flex-shrink-0">
-              <Clock className="w-5 h-5 text-sky-400" />
+              <Clock className="w-5 h-5 text-blue-500" />
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-medium text-white/45 uppercase tracking-wide">Total workout</p>
-              <p className="text-2xl font-bold tabular-nums leading-tight">
+              <p className="font-numeric text-2xl font-bold tabular-nums leading-tight">
                 {formatTotalWorkoutClock(totalWorkoutSec)}
               </p>
             </div>
@@ -698,14 +698,14 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
             <button
               type="button"
               onClick={() => setRoutineEditorOpen(true)}
-              className="flex items-center gap-1.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-100 px-3 py-1.5 rounded-xl transition-colors"
+              className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-100 px-3 py-1.5 rounded-xl transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" />
               Edit routine
             </button>
             <input
               type="date"
-              className="text-xs font-medium text-zinc-600 bg-zinc-50 px-3 py-2 rounded-xl border border-zinc-200 outline-none focus:border-sky-400"
+              className="text-xs font-medium text-zinc-600 bg-zinc-50 px-3 py-2 rounded-xl border border-zinc-200 outline-none focus:border-blue-600"
               value={sessionDate}
               onChange={e => setSessionDate(e.target.value)}
             />
@@ -739,7 +739,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                           <th
                             key={si}
                             colSpan={hasWeightEx ? 2 : 1}
-                            className="px-2 py-2.5 text-[9px] font-medium text-sky-400 uppercase tracking-wide text-center border-l border-zinc-100"
+                            className="px-2 py-2.5 text-[9px] font-medium text-blue-600 uppercase tracking-wide text-center border-l border-zinc-100"
                             style={{ minWidth: hasWeightEx ? '108px' : '72px' }}
                           >
                             Set {si + 1}
@@ -776,7 +776,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                             <span
                               className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[7px] font-medium tracking-wide ${
                                 log.type === 'weight'
-                                  ? 'bg-zinc-100 text-sky-500'
+                                  ? 'bg-zinc-100 text-blue-600'
                                   : log.type === 'reps'
                                     ? 'bg-emerald-100 text-emerald-600'
                                     : 'bg-amber-100 text-amber-600'
@@ -835,7 +835,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                                       type="text"
                                       inputMode="decimal"
                                       pattern="[0-9]*[.,]?[0-9]*"
-                                      className="w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
+                                      className="font-numeric w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-blue-600 focus:bg-white transition-all text-center block mx-auto"
                                       placeholder={wPh}
                                       value={set.weight === 0 ? '' : set.weight}
                                       onChange={e => updateLog(logIdx, si, 'weight', e.target.value)}
@@ -846,7 +846,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                                       type="text"
                                       inputMode="numeric"
                                       pattern="[0-9]*"
-                                      className="w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-sky-400 focus:bg-white transition-all text-center block mx-auto"
+                                      className="font-numeric w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-blue-600 focus:bg-white transition-all text-center block mx-auto"
                                       placeholder={vPh}
                                       value={set.value === 0 ? '' : set.value}
                                       onChange={e => updateLog(logIdx, si, 'value', e.target.value)}
@@ -866,7 +866,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                                   type="text"
                                   inputMode="numeric"
                                   pattern="[0-9]*"
-                                  className={`h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none transition-all text-center block mx-auto ${
+                                  className={`font-numeric h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none transition-all text-center block mx-auto ${
                                     log.type === 'duration'
                                       ? 'w-16 focus:border-amber-400 focus:bg-white'
                                       : 'w-14 focus:border-emerald-400 focus:bg-white'
