@@ -280,7 +280,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
           <div className="px-4 pb-3">
             <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-sky-500 rounded-full transition-all duration-500"
+                className="h-full bg-blue-600 rounded-full transition-all duration-500"
                 style={{ width: `${(totalCompleted / totalDays) * 100}%` }}
               />
             </div>
@@ -300,7 +300,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                   selectedWeek === week
                     ? 'bg-zinc-900 text-white'
                     : allDone
-                      ? 'bg-sky-50 text-sky-600 border border-sky-200'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
                       : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'
                 }`}
               >
@@ -332,12 +332,12 @@ const ProgramView: React.FC<ProgramViewProps> = ({
               <div
                 key={`${workoutDay.week}-${workoutDay.day}`}
                 className={`bg-white rounded-xl border overflow-hidden ${
-                  done ? 'border-sky-200' : 'border-zinc-200'
+                  done ? 'border-blue-200' : 'border-zinc-200'
                 }`}
               >
                 <div
                   className={`px-5 py-4 flex items-center justify-between ${
-                    done ? 'bg-sky-500' : 'bg-zinc-900'
+                    done ? 'bg-blue-600' : 'bg-zinc-900'
                   }`}
                 >
                   <div>
@@ -362,7 +362,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                     <div key={circuit.id} className="px-5 py-3">
                       <div className="flex items-center justify-between mb-2 gap-2">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Dumbbell className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                          <Dumbbell className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
                           <p className="text-xs font-semibold text-zinc-600 truncate">{circuit.name}</p>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -375,7 +375,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                                 circuitIdx,
                               })
                             }
-                            className="p-1 text-zinc-400 hover:text-sky-600 transition-colors"
+                            className="p-1 text-zinc-400 hover:text-blue-700 transition-colors"
                             aria-label={`Add exercise to ${circuit.name}`}
                             title="Add exercise"
                           >
@@ -407,7 +407,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                               <span
                                 className={`text-[8px] font-medium px-1 py-0.5 rounded inline-block mt-0.5 ${
                                   ex.type === 'weight'
-                                    ? 'bg-zinc-100 text-sky-500'
+                                    ? 'bg-zinc-100 text-blue-600'
                                     : ex.type === 'reps'
                                       ? 'bg-zinc-100 text-zinc-500'
                                       : 'bg-amber-100 text-amber-500'
@@ -457,7 +457,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setAddCircuitTarget({ week: workoutDay.week, day: workoutDay.day })}
-                      className="w-full py-2.5 rounded-xl border border-dashed border-zinc-200 text-zinc-600 text-xs font-semibold flex items-center justify-center gap-1.5 hover:border-sky-300 hover:text-sky-700 hover:bg-sky-50/50 transition-colors"
+                      className="w-full py-2.5 rounded-xl border border-dashed border-zinc-200 text-zinc-600 text-xs font-semibold flex items-center justify-center gap-1.5 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50/50 transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Add circuit from library
@@ -511,7 +511,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                       <button
                         type="button"
                         onClick={() => onToggleDayComplete(workoutDay.week, workoutDay.day)}
-                        className="w-full py-2.5 rounded-xl text-xs font-semibold text-sky-700 bg-sky-50 border border-sky-100 hover:bg-sky-100 transition-colors"
+                        className="w-full py-2.5 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-100 hover:bg-blue-100 transition-colors"
                       >
                         Mark day complete (without logging a workout)
                       </button>
@@ -563,9 +563,9 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                       onAppendCircuitFromLibrary(addCircuitTarget.week, addCircuitTarget.day, c);
                       setAddCircuitTarget(null);
                     }}
-                    className="w-full text-left bg-zinc-50 rounded-xl border border-zinc-100 px-4 py-3 flex items-start gap-3 hover:border-sky-300 hover:bg-sky-50/40 transition-colors"
+                    className="w-full text-left bg-zinc-50 rounded-xl border border-zinc-100 px-4 py-3 flex items-start gap-3 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
                   >
-                    <div className="p-2 rounded-lg bg-white border border-zinc-100 text-sky-500 shrink-0">
+                    <div className="p-2 rounded-lg bg-white border border-zinc-100 text-blue-600 shrink-0">
                       <Layers className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
@@ -669,7 +669,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsCustomMode(true)}
-                    className="w-full py-3 rounded-xl border-2 border-dashed border-sky-200 text-sky-600 font-semibold text-sm flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl border-2 border-dashed border-blue-200 text-blue-700 font-semibold text-sm flex items-center justify-center gap-2"
                   >
                     <Plus className="w-4 h-4" />
                     New custom exercise
@@ -687,7 +687,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                           onClick={() => setPickerGroup(group.muscleGroup)}
                           className="p-3 bg-zinc-50 rounded-xl border border-zinc-100 text-left hover:border-zinc-300 transition-colors"
                         >
-                          <ChevronRight className="w-4 h-4 text-sky-500 mb-1" />
+                          <ChevronRight className="w-4 h-4 text-blue-600 mb-1" />
                           <span className="text-xs font-semibold text-zinc-800 line-clamp-2">
                             {group.muscleGroup}
                           </span>
@@ -717,7 +717,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                     <input
                       type="text"
                       placeholder="Search…"
-                      className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm outline-none focus:border-sky-400"
+                      className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl text-sm outline-none focus:border-blue-600"
                       value={pickerSearch}
                       onChange={e => setPickerSearch(e.target.value)}
                     />
@@ -741,7 +741,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                           <p className="text-sm font-semibold text-zinc-800">{ex.name}</p>
                           <p className="text-[10px] text-zinc-400 uppercase">{ex.type}</p>
                         </div>
-                        <Plus className="w-4 h-4 text-sky-500" />
+                        <Plus className="w-4 h-4 text-blue-600" />
                       </button>
                     ))}
                   </div>

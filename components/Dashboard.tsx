@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { Circuit, WorkoutSession, Program } from '../types';
 import {
   Play, Trash2, PlusCircle, Pencil, Check, Upload,
-  BookOpen, ChevronLeft, ChevronRight, Flame, Clock, ChevronDown,
+  BookOpen, ChevronLeft, ChevronRight, Flame, Clock, ChevronDown, Download,
 } from 'lucide-react';
 
 export type DashboardTourSection = 'today' | 'calendar' | 'stats' | 'programs' | 'circuits';
@@ -89,22 +89,22 @@ const WorkoutCalendar: React.FC<{ history: WorkoutSession[] }> = ({ history }) =
   while (cells.length % 7 !== 0) cells.push(null);
 
   return (
-    <div className="bg-white rounded-2xl p-4 border border-zinc-200">
+    <div className="bg-white rounded-2xl p-4 border border-slate-200">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-zinc-800">Workout Calendar</h4>
+        <h4 className="text-sm font-semibold text-slate-800">Workout Calendar</h4>
         <div className="flex items-center gap-1">
-          <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="p-1 text-zinc-400 hover:text-zinc-700 rounded-lg transition-colors" aria-label="Previous month">
+          <button onClick={() => setViewDate(new Date(year, month - 1, 1))} className="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition-colors" aria-label="Previous month">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-xs font-medium text-zinc-600 min-w-[88px] text-center">{MONTH_NAMES[month]} {year}</span>
-          <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="p-1 text-zinc-400 hover:text-zinc-700 rounded-lg transition-colors" aria-label="Next month">
+          <span className="text-xs font-medium text-slate-600 min-w-[88px] text-center">{MONTH_NAMES[month]} {year}</span>
+          <button onClick={() => setViewDate(new Date(year, month + 1, 1))} className="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition-colors" aria-label="Next month">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
       <div className="grid grid-cols-7 mb-1">
         {['S','M','T','W','T','F','S'].map((d, i) => (
-          <div key={i} className="text-center text-[9px] font-medium text-zinc-400 py-1">{d}</div>
+          <div key={i} className="text-center text-[9px] font-medium text-slate-400 py-1">{d}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-y-0.5">
@@ -116,7 +116,7 @@ const WorkoutCalendar: React.FC<{ history: WorkoutSession[] }> = ({ history }) =
           return (
             <div key={i} className="flex items-center justify-center py-0.5">
               <div className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-medium ${
-                isWorkout ? 'bg-sky-500 text-white' : isToday ? 'ring-2 ring-sky-300 text-sky-600' : 'text-zinc-500'
+                isWorkout ? 'bg-sky-500 text-white' : isToday ? 'ring-2 ring-sky-300 text-sky-600' : 'text-slate-500'
               }`}>{day}</div>
             </div>
           );
@@ -125,7 +125,7 @@ const WorkoutCalendar: React.FC<{ history: WorkoutSession[] }> = ({ history }) =
       {workoutDays.size > 0 && (
         <div className="mt-3 flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full bg-sky-500" />
-          <span className="text-[10px] text-zinc-400 font-medium">Workout completed</span>
+          <span className="text-[10px] text-slate-400 font-medium">Workout completed</span>
         </div>
       )}
     </div>
@@ -136,7 +136,7 @@ const WorkoutCalendar: React.FC<{ history: WorkoutSession[] }> = ({ history }) =
 
 const tourSectionClass = (active: boolean) =>
   `rounded-2xl transition-[box-shadow,ring] duration-500 ${
-    active ? 'ring-2 ring-sky-500 ring-offset-2 ring-offset-zinc-50 shadow-xl relative z-[1]' : ''
+    active ? 'ring-2 ring-sky-500 ring-offset-2 ring-offset-slate-50 shadow-xl relative z-[1]' : ''
   }`;
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -201,7 +201,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       {/* Today Card */}
       <div
         id={tourIds ? 'landing-tour-today' : undefined}
-        className={`bg-zinc-900 text-white rounded-2xl p-5 ${tourSectionClass(highlightTour === 'today')}`}
+        className={`bg-slate-900 text-white rounded-2xl p-5 ${tourSectionClass(highlightTour === 'today')}`}
       >
         <div className="flex items-start justify-between mb-4">
           <div>
@@ -228,7 +228,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             {lastSessionCircuits.length > 0 && (
               <button
                 onClick={() => onStart(lastSessionCircuits)}
-                className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-400 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors active:scale-95 flex-shrink-0"
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors active:scale-95 flex-shrink-0"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 Start Again
@@ -258,13 +258,13 @@ const Dashboard: React.FC<DashboardProps> = ({
         id={tourIds ? 'landing-tour-stats' : undefined}
         className={`grid grid-cols-2 gap-3 ${tourSectionClass(highlightTour === 'stats')}`}
       >
-        <div className="bg-white rounded-2xl p-4 border border-zinc-200">
-          <span className="block text-xs text-zinc-500 font-medium mb-1">Total workouts</span>
-          <span className="text-2xl font-bold text-zinc-900">{history.length}</span>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200">
+          <span className="block text-xs text-slate-500 font-medium mb-1">Total workouts</span>
+          <span className="text-2xl font-bold text-slate-900">{history.length}</span>
         </div>
-        <div className="bg-white rounded-2xl p-4 border border-zinc-200">
-          <span className="block text-xs text-zinc-500 font-medium mb-1">This month</span>
-          <span className="text-2xl font-bold text-zinc-900">{thisMonthCount}</span>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200">
+          <span className="block text-xs text-slate-500 font-medium mb-1">This month</span>
+          <span className="text-2xl font-bold text-slate-900">{thisMonthCount}</span>
         </div>
       </div>
 
@@ -274,16 +274,26 @@ const Dashboard: React.FC<DashboardProps> = ({
         className={`space-y-3 ${tourSectionClass(highlightTour === 'programs')}`}
       >
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold text-zinc-800">Programs</h3>
-          <button onClick={onImportCSV} className="text-sky-500 text-xs font-medium flex items-center gap-1">
-            <Upload className="w-3.5 h-3.5" />
-            Import CSV
-          </button>
+          <h3 className="text-sm font-semibold text-slate-800">Programs</h3>
+          <div className="flex items-center gap-3">
+            <a
+              href="/program-template.csv"
+              download
+              className="text-slate-500 hover:text-slate-700 text-xs font-medium flex items-center gap-1 transition-colors px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Template
+            </a>
+            <button onClick={onImportCSV} className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors">
+              <Upload className="w-3.5 h-3.5" />
+              Import CSV
+            </button>
+          </div>
         </div>
         {programs.length === 0 ? (
           <button
             onClick={onImportCSV}
-            className="w-full text-center py-6 bg-white rounded-2xl border border-dashed border-zinc-300 text-zinc-400 hover:border-sky-400 hover:text-sky-500 transition-all"
+            className="w-full text-center py-6 bg-white rounded-2xl border border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-600 transition-all"
           >
             <BookOpen className="w-7 h-7 mx-auto mb-1.5 opacity-40" />
             <p className="text-xs font-medium">Import a CSV to create a program</p>
@@ -298,27 +308,27 @@ const Dashboard: React.FC<DashboardProps> = ({
               return (
                 <div
                   key={program.id}
-                  className="bg-white p-3.5 rounded-xl border border-zinc-200 hover:border-zinc-300 transition-all flex items-center justify-between cursor-pointer"
+                  className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all flex items-center justify-between cursor-pointer"
                   onClick={() => onOpenProgram(program)}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 bg-zinc-100 rounded-xl flex-shrink-0">
-                      <BookOpen className="w-4 h-4 text-zinc-600" />
+                    <div className="p-2 bg-slate-100 rounded-xl flex-shrink-0">
+                      <BookOpen className="w-4 h-4 text-slate-600" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-zinc-900 text-sm truncate">{program.name}</p>
-                      <p className="text-[10px] text-zinc-400 font-medium">{program.totalWeeks}w · {wpw}d/week</p>
+                      <p className="font-semibold text-slate-900 text-sm truncate">{program.name}</p>
+                      <p className="text-[10px] text-slate-400 font-medium">{program.totalWeeks}w · {wpw}d/week</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-0.5 ml-2 flex-shrink-0">
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteProgram(program.id); }}
-                      className="p-1.5 text-zinc-300 hover:text-red-500 transition-colors"
+                      className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
                       aria-label={`Delete ${program.name}`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    <ChevronRight className="w-4 h-4 text-zinc-300" />
+                    <ChevronRight className="w-4 h-4 text-slate-300" />
                   </div>
                 </div>
               );
@@ -333,17 +343,17 @@ const Dashboard: React.FC<DashboardProps> = ({
         className={`space-y-3 ${tourSectionClass(highlightTour === 'circuits')}`}
       >
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold text-zinc-800">My Circuits</h3>
-          <button onClick={onNew} className="text-sky-500 text-xs font-medium flex items-center gap-1">
+          <h3 className="text-sm font-semibold text-slate-800">My Circuits</h3>
+          <button onClick={onNew} className="text-blue-600 hover:text-blue-700 text-xs font-medium flex items-center gap-1 transition-colors">
             <PlusCircle className="w-3.5 h-3.5" />
             New Circuit
           </button>
         </div>
 
         {circuits.length === 0 ? (
-          <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-zinc-300">
-            <p className="text-zinc-400 text-sm mb-3">No circuits yet.</p>
-            <button onClick={onNew} className="px-5 py-2 bg-zinc-900 text-white rounded-xl text-sm font-medium">
+          <div className="text-center py-8 bg-white rounded-2xl border border-dashed border-slate-300">
+            <p className="text-slate-400 text-sm mb-3">No circuits yet.</p>
+            <button onClick={onNew} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 transition-colors text-white rounded-xl text-sm font-medium">
               Build First Circuit
             </button>
           </div>
@@ -354,15 +364,15 @@ const Dashboard: React.FC<DashboardProps> = ({
               const isCollapsed = collapsedCats.has(cat);
               const selectedInCat = catCircuits.filter(c => selectedIds.includes(c.id)).length;
               return (
-                <div key={cat} className="bg-white rounded-2xl border border-zinc-200 overflow-hidden">
+                <div key={cat} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
                   {/* Category header */}
                   <button
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-50 transition-colors"
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
                     onClick={() => toggleCat(cat)}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-zinc-800">{cat}</span>
-                      <span className="text-[10px] font-medium text-zinc-400 bg-zinc-100 px-1.5 py-0.5 rounded-md">
+                      <span className="text-sm font-semibold text-slate-800">{cat}</span>
+                      <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-md">
                         {catCircuits.length}
                       </span>
                       {selectedInCat > 0 && (
@@ -371,11 +381,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </span>
                       )}
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`} />
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`} />
                   </button>
                   {/* Circuit rows */}
                   {!isCollapsed && (
-                    <div className="border-t border-zinc-100 divide-y divide-zinc-50">
+                    <div className="border-t border-slate-100 divide-y divide-slate-50">
                       {catCircuits.map(circuit => {
                         const isSelected = selectedIds.includes(circuit.id);
                         const names = circuit.exercises.map(ex => ex.name);
@@ -384,24 +394,24 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <div
                             key={circuit.id}
                             className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-colors ${
-                              isSelected ? 'bg-zinc-50' : 'hover:bg-zinc-50/50'
+                              isSelected ? 'bg-slate-50' : 'hover:bg-slate-50/50'
                             }`}
                             onClick={() => toggleSelection(circuit.id)}
                           >
                             <div className="flex items-center gap-3 flex-1 min-w-0">
                               <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors flex-shrink-0 ${
-                                isSelected ? 'bg-zinc-900 border-zinc-900' : 'border-zinc-300'
+                                isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300'
                               }`}>
                                 {isSelected && <Check className="w-3 h-3 text-white" />}
                               </div>
                               <div className="min-w-0">
-                                <h4 className="font-semibold text-zinc-900 text-sm truncate">{circuit.name}</h4>
-                                <p className="text-zinc-400 text-[10px] truncate">{preview}</p>
-                                <p className="text-zinc-300 text-[10px] mt-0.5">{circuitLastUsed[circuit.id]}</p>
+                                <h4 className="font-semibold text-slate-900 text-sm truncate">{circuit.name}</h4>
+                                <p className="text-slate-400 text-[10px] truncate">{preview}</p>
+                                <p className="text-slate-300 text-[10px] mt-0.5">{circuitLastUsed[circuit.id]}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-0.5 ml-2">
-                              <button onClick={(e) => { e.stopPropagation(); onEdit(circuit); }} className="p-1.5 text-zinc-300 hover:text-zinc-600 transition-colors" aria-label={`Edit ${circuit.name}`}>
+                              <button onClick={(e) => { e.stopPropagation(); onEdit(circuit); }} className="p-1.5 text-slate-300 hover:text-slate-600 transition-colors" aria-label={`Edit ${circuit.name}`}>
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button onClick={(e) => { e.stopPropagation(); onDelete(circuit.id); }} className="p-1.5 text-zinc-300 hover:text-red-500 transition-colors" aria-label={`Delete ${circuit.name}`}>
@@ -426,24 +436,24 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div
                   key={circuit.id}
                   className={`bg-white p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                    isSelected ? 'border-zinc-900 ring-1 ring-zinc-900' : 'border-zinc-200 hover:border-zinc-300'
+                    isSelected ? 'border-blue-600 ring-1 ring-blue-600' : 'border-slate-200 hover:border-slate-300'
                   }`}
                   onClick={() => toggleSelection(circuit.id)}
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className={`w-5 h-5 rounded-md flex items-center justify-center border-2 transition-colors flex-shrink-0 ${
-                      isSelected ? 'bg-zinc-900 border-zinc-900' : 'border-zinc-300'
+                      isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300'
                     }`}>
                       {isSelected && <Check className="w-3 h-3 text-white" />}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-semibold text-zinc-900 text-sm truncate">{circuit.name}</h4>
-                      <p className="text-zinc-400 text-[10px] truncate">{preview}</p>
-                      <p className="text-zinc-300 text-[10px] mt-0.5">{circuitLastUsed[circuit.id]}</p>
+                      <h4 className="font-semibold text-slate-900 text-sm truncate">{circuit.name}</h4>
+                      <p className="text-slate-400 text-[10px] truncate">{preview}</p>
+                      <p className="text-slate-300 text-[10px] mt-0.5">{circuitLastUsed[circuit.id]}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-0.5 ml-2">
-                    <button onClick={(e) => { e.stopPropagation(); onEdit(circuit); }} className="p-1.5 text-zinc-300 hover:text-zinc-600 transition-colors" aria-label={`Edit ${circuit.name}`}>
+                    <button onClick={(e) => { e.stopPropagation(); onEdit(circuit); }} className="p-1.5 text-slate-300 hover:text-slate-600 transition-colors" aria-label={`Edit ${circuit.name}`}>
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                     <button onClick={(e) => { e.stopPropagation(); onDelete(circuit.id); }} className="p-1.5 text-zinc-300 hover:text-red-500 transition-colors" aria-label={`Delete ${circuit.name}`}>
@@ -461,7 +471,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4">
           <button
             onClick={() => { if (selectedIds.length > 0) onStart(circuits.filter(c => selectedIds.includes(c.id))); }}
-            className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-semibold shadow-xl flex items-center justify-center gap-2"
+            className="w-full bg-blue-600 hover:bg-blue-700 transition-colors text-white py-4 rounded-2xl font-semibold shadow-xl flex items-center justify-center gap-2"
           >
             <Play className="w-4 h-4 fill-current" />
             Start Workout{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}

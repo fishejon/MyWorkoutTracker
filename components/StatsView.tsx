@@ -88,7 +88,7 @@ const StatsView: React.FC<StatsViewProps> = ({ history }) => {
               <XAxis dataKey="date" hide />
               <YAxis hide />
               <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e4e4e7', boxShadow: 'none', fontSize: 12 }} />
-              <Line type="monotone" dataKey="volume" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 3, fill: '#0ea5e9' }} activeDot={{ r: 5 }} />
+              <Line type="monotone" dataKey="volume" stroke="#2563eb" strokeWidth={2} dot={{ r: 3, fill: '#2563eb' }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -118,12 +118,12 @@ const StatsView: React.FC<StatsViewProps> = ({ history }) => {
 
           {/* PR banner */}
           {pr && selectedMeta && (
-            <div className="bg-sky-50 border border-sky-100 rounded-2xl p-4 flex items-center justify-between">
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-semibold text-sky-500 uppercase tracking-wider mb-0.5">Personal Record</p>
+                <p className="text-[10px] font-semibold text-red-600 uppercase tracking-wider mb-0.5">Personal Record</p>
                 <p className="text-sm font-semibold text-zinc-800">{selectedMeta.name}</p>
               </div>
-              <div className="text-2xl font-bold text-zinc-900">{pr}</div>
+              <div className="font-numeric text-2xl font-bold text-red-700">{pr}</div>
             </div>
           )}
 
@@ -137,7 +137,7 @@ const StatsView: React.FC<StatsViewProps> = ({ history }) => {
                     <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#a1a1aa' }} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#a1a1aa' }} />
                     <Tooltip contentStyle={{ borderRadius: '10px', border: '1px solid #e4e4e7', boxShadow: 'none', fontSize: 12 }} cursor={{ fill: '#f9f9f9' }} />
-                    <Bar dataKey="val" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="val" fill="#2563eb" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
