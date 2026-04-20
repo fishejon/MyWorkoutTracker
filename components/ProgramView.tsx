@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   Play,
   Dumbbell,
+  Layers,
   Trash2,
   CalendarDays,
   CheckCircle2,
@@ -27,6 +28,9 @@ import { EXERCISE_GROUPS } from '../constants';
 
 interface ProgramViewProps {
   program: Program;
+  /** User's saved circuits from Home — used to add a full circuit to a program day. */
+  libraryCircuits: Circuit[];
+  onAppendCircuitFromLibrary: (week: number, day: number, template: Circuit) => void;
   customExercises: CustomExercise[];
   onSaveCustomExercise: (ex: CustomExercise) => void;
   onPatchCircuit: (week: number, day: number, circuitIdx: number, circuit: Circuit) => void;
@@ -42,6 +46,8 @@ type EditTarget = { week: number; day: number; circuitIdx: number; exerciseIndex
 
 const ProgramView: React.FC<ProgramViewProps> = ({
   program,
+  libraryCircuits,
+  onAppendCircuitFromLibrary,
   customExercises,
   onSaveCustomExercise,
   onPatchCircuit,
@@ -81,6 +87,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
   const [customName, setCustomName] = useState('');
   const [customType, setCustomType] = useState<ExerciseType>('weight');
   const [customMuscleGroup, setCustomMuscleGroup] = useState<string | null>(null);
+  const [addCircuitTarget, setAddCircuitTarget] = useState<{ week: number; day: number } | null>(null);
 
   const editExerciseSnapshot = useMemo((): CircuitExercise | null => {
     if (!editTarget) return null;
@@ -446,6 +453,16 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                       </div>
                     </div>
                   ))}
+                  <div className="px-5 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setAddCircuitTarget({ week: workoutDay.week, day: workoutDay.day })}
+                      className="w-full py-2.5 rounded-xl border border-dashed border-zinc-200 text-zinc-600 text-xs font-semibold flex items-center justify-center gap-1.5 hover:border-sky-300 hover:text-sky-700 hover:bg-sky-50/50 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add circuit from library
+                    </button>
+                  </div>
                 </div>
 
                 <div className="px-5 py-4 border-t border-zinc-100 space-y-2">
@@ -488,7 +505,7 @@ const ProgramView: React.FC<ProgramViewProps> = ({
                       </button>
                       {totalExercises === 0 && (
                         <p className="text-[11px] text-amber-700 text-center font-medium">
-                          Add at least one exercise to start this day.
+                          Add a circuit from your library or exercises to a circuit to start this day.
                         </p>
                       )}
                       <button
@@ -506,6 +523,65 @@ const ProgramView: React.FC<ProgramViewProps> = ({
           })
         )}
       </div>
+
+      {addCircuitTarget && (
+        <div
+          className="fixed inset-0 z-[210] flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-circuit-title"
+          onClick={e => e.target === e.currentTarget && setAddCircuitTarget(null)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col shadow-xl border border-zinc-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-zinc-100 flex items-center justify-between shrink-0">
+              <h3 id="add-circuit-title" className="font-bold text-zinc-900 text-sm">
+                Add circuit to Week {addCircuitTarget.week} · Day {addCircuitTarget.day}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAddCircuitTarget(null)}
+                className="p-2 text-zinc-400 hover:bg-zinc-100 rounded-full"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 pb-8 space-y-2">
+              {libraryCircuits.length === 0 ? (
+                <p className="text-sm text-zinc-500 text-center py-8 px-2">
+                  No saved circuits yet. Create circuits on Home, then add them here.
+                </p>
+              ) : (
+                libraryCircuits.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      onAppendCircuitFromLibrary(addCircuitTarget.week, addCircuitTarget.day, c);
+                      setAddCircuitTarget(null);
+                    }}
+                    className="w-full text-left bg-zinc-50 rounded-xl border border-zinc-100 px-4 py-3 flex items-start gap-3 hover:border-sky-300 hover:bg-sky-50/40 transition-colors"
+                  >
+                    <div className="p-2 rounded-lg bg-white border border-zinc-100 text-sky-500 shrink-0">
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-zinc-900 text-sm truncate">{c.name}</p>
+                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                        {c.exercises.length} exercise{c.exercises.length !== 1 ? 's' : ''}
+                        {c.category ? ` · ${c.category}` : ''}
+                      </p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Exercise library picker */}
       {pickerTarget && (

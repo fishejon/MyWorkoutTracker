@@ -26,39 +26,9 @@ import StatsView from './components/StatsView';
 import ProgramUpload from './components/ProgramUpload';
 import ProgramView from './components/ProgramView';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
-import { debugSessionLog, readDebugSessionLog } from './utils/debugSessionLog';
+import { cloneCircuitWithNewId } from './services/circuitClone';
 
 const ID_TOKEN_STORAGE_KEY = 'mwt_google_id_token';
-
-/** Fixed above the workout UI so you can leave or copy debug logs if the screen is blank. */
-function ActiveWorkoutEscapeBar({ onExit }: { onExit: () => void }) {
-  return (
-    <div
-      className="fixed left-1/2 bottom-[max(6.5rem,calc(5.5rem+env(safe-area-inset-bottom,0px)))] z-[99999] flex w-[min(100vw-1rem,22rem)] -translate-x-1/2 justify-center px-0 pointer-events-none"
-    >
-      <div className="pointer-events-auto flex w-full max-w-full flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-zinc-200/90 bg-white/95 px-2 py-1.5 shadow-xl backdrop-blur-md">
-        <button
-          type="button"
-          onClick={onExit}
-          className="text-[11px] font-semibold text-zinc-900 px-3 py-1.5 rounded-xl bg-zinc-100 active:scale-[0.98]"
-        >
-          Exit workout
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const raw = readDebugSessionLog();
-            const text = raw || '(no debug rows captured yet — try Exit and start again)';
-            void navigator.clipboard?.writeText(text);
-          }}
-          className="text-[11px] font-semibold text-sky-800 px-3 py-1.5 rounded-xl bg-sky-50 active:scale-[0.98]"
-        >
-          Copy debug log
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /** Decode a JWT and check whether its `exp` claim is in the past. */
 function isTokenExpired(token: string): boolean {
@@ -82,9 +52,6 @@ type AuthedUser = {
 type AuthStatus = 'checking' | 'unauth' | 'authed';
 
 const dayCompleteKey = (d: { week: number; day: number }) => `${d.week}:${d.day}`;
-
-/** Debug fc332b: log App active branch once per mount id (avoid render spam). */
-let dbgActiveBranchKey = '';
 
 /** Merge program day completions from localStorage into server programs (fixes lost checkmarks after refresh). */
 function mergeProgramCompletionsFromLocal(
@@ -430,13 +397,6 @@ const App: React.FC = () => {
     setActiveWorkoutMountId(n => n + 1);
     setActiveCircuits(selectedCircuits);
     setView('active');
-    // #region agent log
-    debugSessionLog('H2', 'App:handleStartWorkout', 'setView_active', {
-      circuitCount: selectedCircuits.length,
-      circuitIds: selectedCircuits.map(c => c.id).join('|'),
-      exerciseCount: selectedCircuits.reduce((n, c) => n + c.exercises.length, 0),
-    });
-    // #endregion
   };
 
   const handleToggleProgramDayComplete = (programId: string, week: number, day: number) => {
@@ -555,6 +515,23 @@ const App: React.FC = () => {
     setEditingProgramCircuit(null);
   };
 
+  /** Append a cloned circuit from the user library to a program day. */
+  const handleAppendCircuitToProgramDay = (week: number, day: number, template: Circuit) => {
+    if (!viewingProgram) return;
+    const newC = cloneCircuitWithNewId(template);
+    const updatedProgram: Program = {
+      ...viewingProgram,
+      schedule: viewingProgram.schedule.map(d =>
+        d.week === week && d.day === day ? { ...d, circuits: [...d.circuits, newC] } : d
+      ),
+    };
+    const updatedPrograms = programs.map(p => (p.id === viewingProgram.id ? updatedProgram : p));
+    setPrograms(updatedPrograms);
+    setViewingProgram(updatedProgram);
+    savePrograms(updatedPrograms);
+    void persistUserData(circuits, history, customExercises, updatedPrograms);
+  };
+
   /** Inline edits from ProgramView: drops circuits with no exercises. */
   const handlePatchProgramCircuit = (week: number, day: number, circuitIdx: number, nextCircuit: Circuit) => {
     if (!viewingProgram) return;
@@ -639,16 +616,6 @@ const App: React.FC = () => {
           />
         );
       case 'active': {
-        const branchKey = `${activeWorkoutMountId}_${activeCircuits.length}`;
-        if (branchKey !== dbgActiveBranchKey) {
-          dbgActiveBranchKey = branchKey;
-          // #region agent log
-          debugSessionLog('H2', 'App:renderView:active', 'enter', {
-            activeCircuitsLen: activeCircuits.length,
-            activeWorkoutMountId,
-          });
-          // #endregion
-        }
         const exitActiveWorkout = () => {
           setActiveCircuits([]);
           setActiveProgramContext(null);
@@ -657,7 +624,6 @@ const App: React.FC = () => {
         if (activeCircuits.length === 0) {
           return (
             <>
-              <ActiveWorkoutEscapeBar onExit={exitActiveWorkout} />
               <div className="flex flex-col h-full bg-zinc-50 items-center justify-center p-8 text-center">
                 <p className="text-zinc-600 text-sm font-medium mb-2">No workout could be loaded.</p>
                 <p className="text-zinc-400 text-xs mb-6">Try starting again from Home or your program.</p>
@@ -674,10 +640,14 @@ const App: React.FC = () => {
         }
         return (
           <>
-            <ActiveWorkoutEscapeBar onExit={exitActiveWorkout} />
             <ActiveWorkout
               key={activeWorkoutMountId}
               circuits={activeCircuits}
+              libraryCircuits={circuits}
+              onCircuitsChange={setActiveCircuits}
+              customExercises={customExercises}
+              existingCategories={existingCategories}
+              onSaveCustomExercise={handleSaveCustomExercise}
               history={history}
               onFinish={handleFinishWorkout}
               onCancel={exitActiveWorkout}
@@ -716,6 +686,8 @@ const App: React.FC = () => {
         return (
           <ProgramView
             program={viewingProgram}
+            libraryCircuits={circuits}
+            onAppendCircuitFromLibrary={handleAppendCircuitToProgramDay}
             customExercises={customExercises}
             onSaveCustomExercise={handleSaveCustomExercise}
             onPatchCircuit={handlePatchProgramCircuit}
@@ -725,13 +697,6 @@ const App: React.FC = () => {
               setActiveCircuits(workoutDay.circuits);
               setActiveProgramContext({ programId: viewingProgram.id, week: workoutDay.week, day: workoutDay.day });
               setView('active');
-              // #region agent log
-              debugSessionLog('H2', 'App:onStartDay', 'setView_active', {
-                circuitCount: workoutDay.circuits.length,
-                week: workoutDay.week,
-                day: workoutDay.day,
-              });
-              // #endregion
             }}
             onToggleDayComplete={(week, day) =>
               handleToggleProgramDayComplete(viewingProgram.id, week, day)
