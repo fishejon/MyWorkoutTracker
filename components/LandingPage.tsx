@@ -1,0 +1,414 @@
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
+import {
+  BarChart3,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  Dumbbell,
+  History as HistoryIcon,
+  Home,
+  Layers,
+  Pencil,
+  Play,
+  Plus,
+  Sparkles,
+  Trash2,
+} from 'lucide-react';
+import Dashboard, { DashboardTourSection } from './Dashboard';
+import { LANDING_DEMO_CIRCUITS, LANDING_DEMO_HISTORY, LANDING_DEMO_PROGRAM } from '../data/landingDemo';
+
+export type LandingTourId = DashboardTourSection | 'program-detail';
+
+const TOUR_ORDER: LandingTourId[] = ['today', 'calendar', 'stats', 'programs', 'circuits', 'program-detail'];
+
+const TOUR_COPY: Record<LandingTourId, { title: string; body: string }> = {
+  today: {
+    title: 'Your day at a glance',
+    body: 'See today’s date, streaks when you’re on a roll, your last session, and jump back in with Start Again when it fits.',
+  },
+  calendar: {
+    title: 'Workout calendar',
+    body: 'Flip through months. Days you trained light up so you can spot consistency and gaps at a glance.',
+  },
+  stats: {
+    title: 'Quick totals',
+    body: 'Total workouts and how many you logged this month — lightweight stats right next to your calendar.',
+  },
+  programs: {
+    title: 'Programs from CSV',
+    body: 'Import structured plans (single day or multi-week), open a program to work a day, and remove plans you no longer need.',
+  },
+  circuits: {
+    title: 'Custom circuits',
+    body: 'Group circuits by category, tap to multi-select, edit or delete in place, then start a session from your picks.',
+  },
+  'program-detail': {
+    title: 'Inside a program',
+    body: 'Start any day, mark completion, pull circuits from your library, and edit exercises — without leaving the flow.',
+  },
+};
+
+function pickTourFromScroll(): LandingTourId {
+  const centerY = window.innerHeight * 0.4;
+  let best: LandingTourId | null = null;
+  let bestScore = Infinity;
+
+  for (const id of TOUR_ORDER) {
+    const el = document.getElementById(`landing-tour-${id}`);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    const anyVisible = r.bottom > 0 && r.top < window.innerHeight;
+    if (!anyVisible) continue;
+
+    const mid = (r.top + r.bottom) / 2;
+    const score = Math.abs(mid - centerY);
+    if (score < bestScore) {
+      bestScore = score;
+      best = id;
+    }
+  }
+
+  return best ?? 'today';
+}
+
+type AuthStatus = 'checking' | 'unauth' | 'authed';
+
+type LandingPageProps = {
+  authStatus: AuthStatus;
+  authError: string | null;
+  onGoogleCredentialMissing?: () => void;
+  onGoogleSuccess: (credential: string) => void;
+  onGoogleError: () => void;
+};
+
+const noop = () => {};
+
+const LandingPage: React.FC<LandingPageProps> = ({
+  authStatus,
+  authError,
+  onGoogleCredentialMissing,
+  onGoogleSuccess,
+  onGoogleError,
+}) => {
+  const [activeTour, setActiveTour] = useState<LandingTourId>('today');
+  /** Scrolls the full landing page (document/body does not scroll — see index.html). */
+  const landingScrollRef = useRef<HTMLDivElement | null>(null);
+  const previewScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const recomputeTour = useCallback(() => {
+    const next = pickTourFromScroll();
+    setActiveTour((prev) => (prev === next ? prev : next));
+  }, []);
+
+  useLayoutEffect(() => {
+    recomputeTour();
+  }, [recomputeTour]);
+
+  useEffect(() => {
+    recomputeTour();
+    window.addEventListener('scroll', recomputeTour, { passive: true });
+    window.addEventListener('resize', recomputeTour);
+    const previewEl = previewScrollRef.current;
+    const landingEl = landingScrollRef.current;
+    previewEl?.addEventListener('scroll', recomputeTour, { passive: true });
+    landingEl?.addEventListener('scroll', recomputeTour, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', recomputeTour);
+      window.removeEventListener('resize', recomputeTour);
+      previewEl?.removeEventListener('scroll', recomputeTour);
+      landingEl?.removeEventListener('scroll', recomputeTour);
+    };
+  }, [recomputeTour]);
+
+  const tourNarrative = useMemo(() => TOUR_COPY[activeTour] ?? TOUR_COPY.today, [activeTour]);
+
+  const highlightDashboard: DashboardTourSection | null =
+    activeTour !== 'program-detail' ? activeTour : null;
+
+  return (
+    <div
+      ref={landingScrollRef}
+      className="h-full min-h-0 overflow-y-auto overflow-x-hidden bg-zinc-50 text-zinc-900"
+    >
+      <header className="border-b border-zinc-200 bg-white/90 backdrop-blur-md">
+        <div className="max-w-5xl mx-auto px-4 py-10 md:py-14 flex flex-col md:flex-row md:items-end md:justify-between gap-8">
+          <div className="space-y-4 max-w-xl">
+            <div className="inline-flex items-center gap-2 rounded-full bg-sky-50 text-sky-800 text-xs font-semibold px-3 py-1 border border-sky-100">
+              <Sparkles className="w-3.5 h-3.5" />
+              Train with clarity
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight italic">
+              MyWorkoutTracker
+            </h1>
+            <p className="text-zinc-600 text-base leading-relaxed">
+              A focused home for logging sessions, building circuits, importing CSV programs, and seeing
+              how often you actually show up — without turning training into spreadsheet work.
+            </p>
+            <ul className="text-sm text-zinc-600 space-y-2">
+              <li className="flex gap-2">
+                <span className="text-sky-500 font-bold">·</span>
+                Calendar + streaks so you can see the week you had, not just the last set.
+              </li>
+              <li className="flex gap-2">
+                <span className="text-sky-500 font-bold">·</span>
+                Custom circuits with categories, multi-select starts, and in-row edit/delete.
+              </li>
+              <li className="flex gap-2">
+                <span className="text-sky-500 font-bold">·</span>
+                Multi-week programs from CSV, with per-day completion as you finish work.
+              </li>
+            </ul>
+          </div>
+          <div className="w-full max-w-sm bg-zinc-900 text-white rounded-2xl p-5 shadow-xl border border-zinc-800">
+            <p className="text-xs text-white/60 font-medium mb-3">Ready when you are</p>
+            <p className="text-sm text-white/80 mb-4">
+              Sign in with Google to sync your data. Your Gemini key stays server-side; we only verify a Google ID token.
+            </p>
+            {authError && (
+              <div className="text-left text-xs bg-amber-500/15 border border-amber-400/40 text-amber-50 rounded-xl p-3 mb-4 whitespace-pre-wrap">
+                {authError}
+              </div>
+            )}
+            <div className="flex justify-center">
+              {authStatus === 'checking' ? (
+                <div className="text-xs text-white/60 font-semibold py-2">Verifying your session…</div>
+              ) : (
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => {
+                    const token = credentialResponse.credential;
+                    if (!token) {
+                      onGoogleCredentialMissing?.();
+                      return;
+                    }
+                    onGoogleSuccess(token);
+                  }}
+                  onError={onGoogleError}
+                  useOneTap
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-10 md:py-14 space-y-10">
+        <section className="space-y-2">
+          <h2 className="text-lg font-bold text-zinc-900">Scroll the real home layout</h2>
+          <p className="text-sm text-zinc-600 max-w-2xl">
+            The preview below uses sample workouts so you can see exactly how the dashboard is structured.
+            As each part reaches the middle of your screen, we call out what it does — the same sections you will use after sign-in.
+          </p>
+        </section>
+
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-8 items-start">
+          <div className="space-y-4">
+            <div className="lg:hidden sticky top-2 z-20 rounded-2xl border border-zinc-200 bg-white/95 backdrop-blur p-4 shadow-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-600 mb-1">
+                {tourNarrative.title}
+              </p>
+              <p className="text-sm text-zinc-700 leading-snug">{tourNarrative.body}</p>
+            </div>
+
+            <div className="rounded-3xl border border-zinc-200 bg-zinc-100/80 shadow-inner overflow-hidden">
+              <div className="bg-zinc-900 text-white px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-1.5 bg-white/10 rounded-lg flex-shrink-0">
+                    <Dumbbell className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold tracking-tight truncate">MyWorkoutTracker</p>
+                    <p className="text-[10px] text-white/50 truncate">Preview — sample data</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-medium text-white/40 uppercase tracking-wide">Home</span>
+              </div>
+
+              <div
+                ref={previewScrollRef}
+                className="max-h-[min(78vh,820px)] overflow-y-auto bg-zinc-50 border-x border-zinc-200/80 scroll-smooth"
+              >
+                <div className="pointer-events-none select-none">
+                  <Dashboard
+                    circuits={LANDING_DEMO_CIRCUITS}
+                    history={LANDING_DEMO_HISTORY}
+                    programs={[LANDING_DEMO_PROGRAM]}
+                    onStart={noop}
+                    onDelete={noop}
+                    onDeleteProgram={noop}
+                    onEdit={noop}
+                    onNew={noop}
+                    onImportCSV={noop}
+                    onOpenProgram={noop}
+                    tourIds
+                    highlightTour={highlightDashboard}
+                  />
+                </div>
+              </div>
+
+              <nav className="glass-nav border-t border-zinc-200/60 px-4 pt-3 pb-4 flex justify-between items-center pointer-events-none select-none">
+                <div className="flex flex-col items-center gap-1 text-sky-500 min-w-[48px]">
+                  <Home className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">Home</span>
+                </div>
+                <div className="relative -top-4 flex flex-col items-center">
+                  <div className="p-4 bg-zinc-900 text-white rounded-2xl shadow-lg ring-8 ring-zinc-50">
+                    <Plus className="w-6 h-6" />
+                  </div>
+                  <span className="text-[10px] font-medium text-zinc-400 mt-6">New</span>
+                </div>
+                <div className="flex flex-col items-center gap-1 text-zinc-400 min-w-[48px]">
+                  <HistoryIcon className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">History</span>
+                </div>
+                <div className="flex flex-col items-center gap-1 text-zinc-400 min-w-[48px]">
+                  <BarChart3 className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">Stats</span>
+                </div>
+              </nav>
+            </div>
+          </div>
+
+          <aside className="hidden lg:block sticky top-24 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm space-y-3">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-sky-600">What you are looking at</p>
+            <h3 className="text-base font-bold text-zinc-900 leading-snug">{tourNarrative.title}</h3>
+            <p className="text-sm text-zinc-600 leading-relaxed">{tourNarrative.body}</p>
+            <div className="pt-2 border-t border-zinc-100 space-y-2">
+              {TOUR_ORDER.map((id) => (
+                <div
+                  key={id}
+                  className={`flex items-center gap-2 text-xs font-medium rounded-lg px-2 py-1.5 ${
+                    activeTour === id ? 'bg-sky-50 text-sky-800' : 'text-zinc-400'
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      activeTour === id ? 'bg-sky-500' : 'bg-zinc-300'
+                    }`}
+                  />
+                  {TOUR_COPY[id].title}
+                </div>
+              ))}
+            </div>
+          </aside>
+        </div>
+
+        <section
+          id="landing-tour-program-detail"
+          className={`rounded-3xl border border-zinc-200 bg-white p-6 md:p-8 space-y-6 transition-[box-shadow,ring] duration-500 ${
+            activeTour === 'program-detail'
+              ? 'ring-2 ring-sky-500 ring-offset-2 ring-offset-zinc-50 shadow-xl'
+              : ''
+          }`}
+        >
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            <div className="space-y-2 max-w-2xl">
+              <div className="inline-flex items-center gap-2 text-xs font-semibold text-zinc-500">
+                <Layers className="w-4 h-4" />
+                One level deeper — programs
+              </div>
+              <h2 className="text-xl font-bold text-zinc-900">After you import a program</h2>
+              <p className="text-sm text-zinc-600 leading-relaxed">
+                Opening a program takes you to a dedicated workspace (this is a simplified peek). From there you can
+                manage weeks and days the way the live app does: start a day as a workout, toggle completion, edit circuits,
+                and delete a program when you are done with the block.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-zinc-500">
+              <BookOpen className="w-4 h-4 text-zinc-400" />
+              <span className="font-medium text-zinc-700">{LANDING_DEMO_PROGRAM.name}</span>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-zinc-700">Week navigator</p>
+                <CalendarDays className="w-4 h-4 text-zinc-400" />
+              </div>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4].map((w) => (
+                  <div
+                    key={w}
+                    className={`flex-1 text-center rounded-xl py-2 text-xs font-semibold border ${
+                      w === 1 ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-500 border-zinc-200'
+                    }`}
+                  >
+                    W{w}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-zinc-500 leading-snug">
+                Jump between weeks, see which days are complete, and focus on the block you are in.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4 space-y-3">
+              <p className="text-xs font-semibold text-zinc-700">Day actions</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-xl bg-white border border-zinc-200 px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-zinc-800">
+                    <Play className="w-3.5 h-3.5 text-sky-500" />
+                    Start day
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Launches the live workout runner</span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-white border border-zinc-200 px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-zinc-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    Mark complete
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Tracks finished program days</span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-white border border-zinc-200 px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-zinc-800">
+                    <Pencil className="w-3.5 h-3.5 text-zinc-500" />
+                    Edit circuits
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Adjust exercises per day</span>
+                </div>
+                <div className="flex items-center justify-between rounded-xl bg-white border border-zinc-200 px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-zinc-800">
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                    Remove program
+                  </div>
+                  <span className="text-[10px] text-zinc-400">Deletes from your library</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-dashed border-sky-200 bg-sky-50/40 p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="space-y-2">
+            <h2 className="text-lg font-bold text-zinc-900">Start with your own data</h2>
+            <p className="text-sm text-zinc-600 max-w-xl">
+              When you are ready, sign in and the preview switches to your workouts, programs, and circuits. Nothing here is saved — it is only a guided tour.
+            </p>
+          </div>
+          <div className="flex-shrink-0 w-full max-w-xs mx-auto md:mx-0">
+            {authStatus === 'checking' ? (
+              <div className="text-center text-xs text-zinc-500 font-semibold py-3">Verifying…</div>
+            ) : (
+              <div className="flex justify-center md:justify-end">
+                <GoogleLogin
+                  onSuccess={(credentialResponse) => {
+                    const token = credentialResponse.credential;
+                    if (!token) {
+                      onGoogleCredentialMissing?.();
+                      return;
+                    }
+                    onGoogleSuccess(token);
+                  }}
+                  onError={onGoogleError}
+                />
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+};
+
+export default LandingPage;

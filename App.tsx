@@ -1,7 +1,5 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus } from 'lucide-react';
-import { GoogleLogin } from '@react-oauth/google';
 import { AppView, Circuit, WorkoutSession, CustomExercise, Program } from './types';
 import {
   getCircuits,
@@ -25,6 +23,7 @@ import HistoryView from './components/HistoryView';
 import StatsView from './components/StatsView';
 import ProgramUpload from './components/ProgramUpload';
 import ProgramView from './components/ProgramView';
+import LandingPage from './components/LandingPage';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { cloneCircuitWithNewId } from './services/circuitClone';
 
@@ -754,62 +753,29 @@ const App: React.FC = () => {
 
   if (authStatus !== 'authed') {
     return (
-      <div className="h-screen-dynamic w-full max-w-md mx-auto bg-slate-50 border-x border-slate-200 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 w-full text-center">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <div className="p-2 bg-indigo-600 rounded-xl">
-              <Dumbbell className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-xl font-black tracking-tight italic text-slate-900">MyWorkoutTracker</h1>
-          </div>
+      <LandingPage
+        authStatus={authStatus}
+        authError={authError}
+        onGoogleCredentialMissing={() =>
+          setAuthError('Google did not return a credential. Check your OAuth client settings.')
+        }
+        onGoogleSuccess={(token) => {
+          setAuthError(null);
+          setIdToken(token);
+          setAuthStatus('checking');
 
-          <p className="text-slate-500 text-sm mb-4">
-            {authStatus === 'checking' ? 'Checking your session…' : 'Sign in to continue.'}
-          </p>
+          try {
+            sessionStorage.setItem(ID_TOKEN_STORAGE_KEY, token);
+          } catch {
+            // ignore
+          }
 
-          {authError && (
-            <div className="text-left text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3 mb-4 whitespace-pre-wrap">
-              {authError}
-            </div>
-          )}
-
-          <div className="flex justify-center">
-            {authStatus === 'checking' ? (
-              <div className="text-xs text-slate-500 font-semibold">Verifying…</div>
-            ) : (
-              <GoogleLogin
-                onSuccess={(credentialResponse) => {
-                  const token = credentialResponse.credential;
-                  if (!token) {
-                    setAuthError('Google did not return a credential. Check your OAuth client settings.');
-                    return;
-                  }
-
-                  setAuthError(null);
-                  setIdToken(token);
-                  setAuthStatus('checking');
-
-                  try {
-                    sessionStorage.setItem(ID_TOKEN_STORAGE_KEY, token);
-                  } catch {
-                    // ignore
-                  }
-
-                  void postAuthEvent('login', token);
-                }}
-                onError={() => {
-                  setAuthError('Google login failed.');
-                }}
-                useOneTap
-              />
-            )}
-          </div>
-
-          <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
-            Your Gemini API key stays server-side. We only send a Google ID token to our backend.
-          </p>
-        </div>
-      </div>
+          void postAuthEvent('login', token);
+        }}
+        onGoogleError={() => {
+          setAuthError('Google login failed.');
+        }}
+      />
     );
   }
 
