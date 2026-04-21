@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus, Layers } from 'lucide-react';
 import { AppView, Circuit, WorkoutSession, CustomExercise, Program } from './types';
 import {
   getCircuits,
@@ -17,6 +17,7 @@ import {
   workoutSessionFingerprint,
 } from './services/workoutSessionFingerprint';
 import Dashboard from './components/Dashboard';
+import CircuitsView from './components/CircuitsView';
 import CircuitBuilder from './components/CircuitBuilder';
 import ActiveWorkout from './components/ActiveWorkout';
 import HistoryView from './components/HistoryView';
@@ -101,6 +102,9 @@ const App: React.FC = () => {
   const [editingProgramCircuit, setEditingProgramCircuit] = useState<{
     programId: string; week: number; day: number; circuitIdx: number; circuit: Circuit;
   } | null>(null);
+
+  /** After saving or canceling CircuitBuilder from Home vs Circuits tab, return here. */
+  const postBuilderMainViewRef = useRef<'dashboard' | 'circuits'>('dashboard');
 
   const hasGoogleClientId = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
@@ -366,7 +370,7 @@ const App: React.FC = () => {
     saveCircuits(updated);
     void persistUserData(updated, history, customExercises);
     setEditingCircuit(null);
-    setView('dashboard');
+    setView(postBuilderMainViewRef.current);
   };
 
   const handleUpdateCircuit = (updatedCircuit: Circuit) => {
@@ -375,7 +379,7 @@ const App: React.FC = () => {
     saveCircuits(updated);
     void persistUserData(updated, history, customExercises);
     setEditingCircuit(null);
-    setView('dashboard');
+    setView(postBuilderMainViewRef.current);
   };
 
   const handleDeleteCircuit = (id: string) => {
@@ -386,7 +390,7 @@ const App: React.FC = () => {
 
     if (editingCircuit?.id === id) {
       setEditingCircuit(null);
-      setView('dashboard');
+      setView(postBuilderMainViewRef.current);
     }
   };
 
@@ -582,13 +586,14 @@ const App: React.FC = () => {
             history={history}
             programs={programs}
             onStart={handleStartWorkout}
-            onDelete={handleDeleteCircuit}
             onDeleteProgram={handleDeleteProgram}
             onEdit={(circuit) => {
+              postBuilderMainViewRef.current = 'dashboard';
               setEditingCircuit(circuit);
               setView('builder');
             }}
             onNew={() => {
+              postBuilderMainViewRef.current = 'dashboard';
               setEditingCircuit(null);
               setView('builder');
             }}
@@ -596,6 +601,25 @@ const App: React.FC = () => {
             onOpenProgram={(program) => {
               setViewingProgram(program);
               setView('program');
+            }}
+          />
+        );
+      case 'circuits':
+        return (
+          <CircuitsView
+            circuits={circuits}
+            history={history}
+            onStart={handleStartWorkout}
+            onDelete={handleDeleteCircuit}
+            onEdit={(circuit) => {
+              postBuilderMainViewRef.current = 'circuits';
+              setEditingCircuit(circuit);
+              setView('builder');
+            }}
+            onNew={() => {
+              postBuilderMainViewRef.current = 'circuits';
+              setEditingCircuit(null);
+              setView('builder');
             }}
           />
         );
@@ -610,7 +634,7 @@ const App: React.FC = () => {
             onUpdate={handleUpdateCircuit}
             onCancel={() => {
               setEditingCircuit(null);
-              setView('dashboard');
+              setView(postBuilderMainViewRef.current);
             }}
           />
         );
@@ -717,13 +741,14 @@ const App: React.FC = () => {
             history={history}
             programs={programs}
             onStart={handleStartWorkout}
-            onDelete={handleDeleteCircuit}
             onDeleteProgram={handleDeleteProgram}
             onEdit={(circuit) => {
+              postBuilderMainViewRef.current = 'dashboard';
               setEditingCircuit(circuit);
               setView('builder');
             }}
             onNew={() => {
+              postBuilderMainViewRef.current = 'dashboard';
               setEditingCircuit(null);
               setView('builder');
             }}
@@ -804,7 +829,7 @@ const App: React.FC = () => {
   return (
     <div className="h-screen-dynamic flex flex-col w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto bg-zinc-50 relative border-x border-zinc-200 overflow-hidden">
       {/* Header */}
-      <header className="bg-zinc-900 text-white px-4 py-3 sticky top-0 z-10 shadow-sm flex-shrink-0">
+      <header className="bg-zinc-900 text-white px-4 py-3 sticky top-0 z-10 shadow-sm flex-shrink-0 border-b border-zinc-800">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="p-1.5 bg-white/10 rounded-lg flex-shrink-0">
@@ -842,40 +867,65 @@ const App: React.FC = () => {
         {renderView()}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-zinc-200/60 px-4 pt-3 pb-[calc(1.25rem+var(--sab))] flex justify-between items-center z-50">
+      {/* Bottom Navigation — 5 columns so Home / Circuits / New / History / Stats stay visually balanced */}
+      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-zinc-200/60 z-50 grid grid-cols-5 items-end pt-2 pb-[calc(0.65rem+var(--sab))] px-1">
         <button
+          type="button"
           onClick={() => setView('dashboard')}
-          className={`flex flex-col items-center gap-1 transition-colors min-w-[48px] ${view === 'dashboard' ? 'text-sky-500' : 'text-zinc-400'}`}
+          className={`flex flex-col items-center justify-end gap-1 pb-1 min-h-[52px] transition-colors ${
+            view === 'dashboard' ? 'text-blue-600' : 'text-zinc-400 hover:text-zinc-600'
+          }`}
         >
           <Home className="w-5 h-5" />
           <span className="text-[10px] font-medium">Home</span>
         </button>
 
         <button
-          onClick={() => {
-            setEditingCircuit(null);
-            setView('builder');
-          }}
-          className="relative -top-5"
+          type="button"
+          onClick={() => setView('circuits')}
+          className={`flex flex-col items-center justify-end gap-1 pb-1 min-h-[52px] transition-colors ${
+            view === 'circuits' ? 'text-blue-600' : 'text-zinc-400 hover:text-zinc-600'
+          }`}
         >
-          <div className="p-4 bg-zinc-900 text-white rounded-2xl shadow-lg ring-8 ring-zinc-50 active:scale-90 transition-all">
-            <Plus className="w-6 h-6" />
-          </div>
-          <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-zinc-400">New</span>
+          <Layers className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Circuits</span>
         </button>
 
+        <div className="flex flex-col items-center justify-end pb-0.5 min-h-[52px]">
+          <button
+            type="button"
+            onClick={() => {
+              postBuilderMainViewRef.current = view === 'circuits' ? 'circuits' : 'dashboard';
+              setEditingCircuit(null);
+              setView('builder');
+            }}
+            className="flex flex-col items-center gap-1 -translate-y-3 active:scale-95 transition-transform"
+            aria-label="New circuit"
+          >
+            <div className="p-3.5 bg-zinc-900 text-white rounded-2xl shadow-lg ring-8 ring-zinc-50">
+              <Plus className="w-6 h-6" />
+            </div>
+            <span className="text-[10px] font-medium text-zinc-400">New</span>
+          </button>
+        </div>
+
         <button
+          type="button"
           onClick={() => setView('history')}
-          className={`flex flex-col items-center gap-1 transition-colors min-w-[48px] ${view === 'history' ? 'text-sky-500' : 'text-zinc-400'}`}
+          className={`flex flex-col items-center justify-end gap-1 pb-1 min-h-[52px] transition-colors ${
+            view === 'history' ? 'text-blue-600' : 'text-zinc-400 hover:text-zinc-600'
+          }`}
         >
           <HistoryIcon className="w-5 h-5" />
           <span className="text-[10px] font-medium">History</span>
         </button>
 
         <button
+          type="button"
           onClick={() => setView('stats')}
-          className={`flex flex-col items-center gap-1 transition-colors min-w-[48px] ${view === 'stats' ? 'text-sky-500' : 'text-zinc-400'}`}
+          className={`flex flex-col items-center justify-end gap-1 pb-1 min-h-[52px] transition-colors ${
+            view === 'stats' ? 'text-blue-600' : 'text-zinc-400 hover:text-zinc-600'
+          }`}
         >
           <BarChart3 className="w-5 h-5" />
           <span className="text-[10px] font-medium">Stats</span>
