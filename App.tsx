@@ -360,7 +360,7 @@ const App: React.FC = () => {
       case 'history':
         return <HistoryView history={history} />;
       case 'stats':
-        return <StatsView history={history} />;
+        return <StatsView history={history} customExercises={customExercises} />;
       default:
         return (
           <Dashboard
