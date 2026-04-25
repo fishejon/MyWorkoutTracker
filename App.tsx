@@ -681,7 +681,7 @@ const App: React.FC = () => {
       case 'history':
         return <HistoryView history={history} onDelete={handleDeleteSession} />;
       case 'stats':
-        return <StatsView history={history} />;
+        return <StatsView history={history} customExercises={customExercises} />;
       case 'upload':
         return (
           <ProgramUpload
