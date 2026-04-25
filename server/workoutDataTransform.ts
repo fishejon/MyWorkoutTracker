@@ -1,6 +1,17 @@
 import { WorkoutSession, ExerciseLog, ExerciseType } from '../types';
 import { randomUUID } from 'crypto';
 
+/** Use client id when it is already a UUID so round-trip / merge with localStorage stays consistent. */
+export function workoutIdForDatabase(sessionId: string | undefined): string {
+  if (
+    sessionId &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)
+  ) {
+    return sessionId;
+  }
+  return randomUUID();
+}
+
 /**
  * Database row types for normalized workout storage
  */
@@ -57,15 +68,17 @@ export function normalizeWorkoutSession(
   workoutSession: WorkoutSession,
   userId: string
 ): NormalizedWorkout {
-  // Generate a new UUID for workout_id since old IDs are timestamps, not UUIDs
-  // The database will also generate UUIDs, but we need consistent IDs for rounds/sets
-  const workoutId = randomUUID();
+  const workoutId = workoutIdForDatabase(workoutSession.id);
   
+  // Use the actual workout date as created_at.
+  // We delete-and-reinsert on every sync, so we can't preserve the true DB insert time.
+  // Using the workout date ensures each row has a distinct, meaningful timestamp.
+  const workoutDate = new Date(workoutSession.date);
   const workout: WorkoutRow = {
     workout_id: workoutId,
     user_id: userId,
-    date: new Date(workoutSession.date),
-    created_at: new Date(),
+    date: workoutDate,
+    created_at: workoutDate,
   };
 
   // Group ExerciseLogs by circuitId (guard against missing or invalid logs)
@@ -96,11 +109,11 @@ export function normalizeWorkoutSession(
 
     const round: RoundRow = {
       round_id: roundId,
-      workout_id: workoutId, // Use the generated UUID, not the old timestamp ID
+      workout_id: workoutId,
       circuit_id: circuitId,
       circuit_name: circuitName,
       round_number: roundNumber,
-      created_at: new Date(),
+      created_at: workoutDate,
     };
 
     // Convert all sets from all exercises in this circuit/round
@@ -116,7 +129,7 @@ export function normalizeWorkoutSession(
           set_index: set.setIndex,
           value: set.value,
           weight: set.weight ?? null,
-          created_at: new Date(),
+          created_at: workoutDate,
         });
       }
     }

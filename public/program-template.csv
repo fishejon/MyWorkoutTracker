@@ -1,0 +1,11 @@
+week,day,circuit_name,exercise_name,type,sets,suggested_weight,suggested_reps
+1,1,Upper Body A,Bench Press,weight,4,135,8
+1,1,Upper Body A,Barbell Row,weight,4,115,10
+1,1,Upper Body A,Push-Up,reps,3,,15
+1,2,Lower Body A,Back Squat,weight,4,185,6
+1,2,Lower Body A,Romanian Deadlift,weight,3,155,8
+1,2,Lower Body A,Plank,duration,3,,45
+2,1,Upper Body B,Incline DB Press,weight,4,60,10
+2,1,Upper Body B,Lat Pulldown,weight,4,120,10
+2,2,Lower Body B,Front Squat,weight,4,135,6
+2,2,Lower Body B,Hamstring Curl,reps,3,,12

@@ -132,6 +132,11 @@ export async function ensureAppSchema(): Promise<void> {
     );
   `;
 
+  // Programs: structured multi-week training plans uploaded via CSV
+  await client`
+    alter table user_data add column if not exists programs jsonb not null default '[]'::jsonb;
+  `;
+
   // Indexes for efficient querying
   await client`create index if not exists workouts_user_id_date_idx on workouts (user_id, date desc);`;
   await client`create index if not exists rounds_workout_id_idx on rounds (workout_id);`;

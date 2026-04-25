@@ -1,7 +1,8 @@
 import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../server/googleAuth.js';
 import { ensureAppSchema, getSql } from '../../server/db.js';
 import { normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
-import { WorkoutSession, CustomExercise } from '../../types.js';
+import { dedupeWorkoutHistoryByContent } from '../../services/workoutSessionFingerprint.js';
+import { WorkoutSession, CustomExercise, Program } from '../../types.js';
 
 const MAX_CUSTOM_EXERCISES = 500;
 const MAX_EXERCISE_NAME_LENGTH = 200;
@@ -49,6 +50,7 @@ type SaveBody = {
   circuits?: unknown;
   history?: unknown;
   customExercises?: unknown;
+  programs?: unknown;
 };
 
 function parseBody(body: unknown): SaveBody {
@@ -93,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await ensureAppSchema();
 
-    const { circuits, history, customExercises: rawCustomExercises } = parseBody(req.body);
+    const { circuits, history, customExercises: rawCustomExercises, programs: rawPrograms } = parseBody(req.body);
     if (!Array.isArray(circuits) || !Array.isArray(history)) {
       res.status(400).send('Invalid body: expected { circuits: Circuit[], history: WorkoutSession[] }');
       return;
@@ -101,6 +103,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Optional: persist user custom exercises when provided (validated and capped)
     const customExercises = Array.isArray(rawCustomExercises)
       ? validateCustomExercises(rawCustomExercises)
+      : undefined;
+    // Optional: persist programs (stored as-is; circuits inside are self-contained)
+    const programs: Program[] | undefined = Array.isArray(rawPrograms)
+      ? (rawPrograms as Program[])
       : undefined;
 
     // Validate and deduplicate workout sessions by ID
@@ -115,7 +121,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       uniqueWorkouts.set(workoutSession.id, workoutSession);
     }
-    const deduplicatedHistory = Array.from(uniqueWorkouts.values());
+    let deduplicatedHistory = Array.from(uniqueWorkouts.values());
+    // Same workout can appear twice with different ids (legacy client ids vs DB UUIDs).
+    deduplicatedHistory = dedupeWorkoutHistoryByContent(deduplicatedHistory);
 
     // Ensure the user exists in users table (verify route usually handles this).
     await sql`
@@ -125,10 +133,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       do update set email = excluded.email, last_seen_at = now();
     `;
 
-    // Save circuits (and optionally custom_exercises) to user_data
-    if (customExercises !== undefined) {
-      // Serialize to plain JSON for jsonb; validated shape is safe for postgres (postgres JSONValue type is strict)
-      const customExercisesJson = JSON.parse(JSON.stringify(customExercises));
+    // Save circuits, and optionally custom_exercises and programs, to user_data
+    const customExercisesJson = customExercises !== undefined
+      ? JSON.parse(JSON.stringify(customExercises))
+      : undefined;
+    const programsJson = programs !== undefined
+      ? JSON.parse(JSON.stringify(programs))
+      : undefined;
+
+    if (customExercisesJson !== undefined && programsJson !== undefined) {
+      await sql`
+        insert into user_data (sub, circuits, custom_exercises, programs, updated_at)
+        values (${user.sub}, ${sql.json(circuits)}, ${sql.json(customExercisesJson)}, ${sql.json(programsJson)}, now())
+        on conflict (sub)
+        do update set
+          circuits = excluded.circuits,
+          custom_exercises = excluded.custom_exercises,
+          programs = excluded.programs,
+          updated_at = now();
+      `;
+    } else if (customExercisesJson !== undefined) {
       await sql`
         insert into user_data (sub, circuits, custom_exercises, updated_at)
         values (${user.sub}, ${sql.json(circuits)}, ${sql.json(customExercisesJson)}, now())
@@ -136,6 +160,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         do update set
           circuits = excluded.circuits,
           custom_exercises = excluded.custom_exercises,
+          updated_at = now();
+      `;
+    } else if (programsJson !== undefined) {
+      await sql`
+        insert into user_data (sub, circuits, programs, updated_at)
+        values (${user.sub}, ${sql.json(circuits)}, ${sql.json(programsJson)}, now())
+        on conflict (sub)
+        do update set
+          circuits = excluded.circuits,
+          programs = excluded.programs,
           updated_at = now();
       `;
     } else {
@@ -152,7 +186,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Save workouts in normalized format using transaction.
     // If client sends empty history, do not wipe server (avoid accidental data loss).
     if (deduplicatedHistory.length > 0) {
-      await sql.begin(async (tx) => {
+      await sql.begin(async (tx: any) => {
         // Delete existing workouts for this user (to handle updates)
         // Cascade delete will automatically remove rounds and exercise_sets
         await tx`

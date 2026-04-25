@@ -15,12 +15,17 @@ export interface CustomExercise extends Exercise {
 
 export interface CircuitExercise extends Exercise {
   sets: number;
+  /** Optional suggested values from a CSV import; pre-filled in the active workout. */
+  suggestedWeight?: number;
+  suggestedValue?: number;
 }
 
 export interface Circuit {
   id: string;
   name: string;
   exercises: CircuitExercise[];
+  /** Optional user-defined category for grouping on the dashboard. */
+  category?: string;
 }
 
 export interface SetLog {
@@ -34,9 +39,12 @@ export interface ExerciseLog {
   exerciseName: string;
   type: ExerciseType;
   sets: SetLog[];
-  circuitId?: string; // Track which circuit this log belongs to
+  circuitId?: string;
   circuitName?: string;
   lastWorkoutSets?: SetLog[]; // Previous workout's sets data for display/reference
+  /** CSV-suggested values — shown as placeholder when no history exists. */
+  suggestedWeight?: number;
+  suggestedValue?: number;
 }
 
 export interface WorkoutSession {
@@ -44,6 +52,58 @@ export interface WorkoutSession {
   circuitNames: string[]; // List of names of circuits performed in this session
   date: string;
   logs: ExerciseLog[];
+  /** Seconds from starting the active workout until Finish (client-only; may be absent after older server sync). */
+  durationSeconds?: number;
 }
 
-export type AppView = 'dashboard' | 'builder' | 'active' | 'history' | 'stats';
+/** In-progress workout persisted to localStorage for refresh / crash recovery. */
+export interface ActiveWorkoutDraft {
+  circuitKey: string;
+  sessionDate: string;
+  /** Wall clock when the session started (used with sessionDate when finishing) */
+  clockISO: string;
+  /** Epoch ms when this workout session began (total elapsed timer, survives refresh) */
+  workoutStartedAtEpoch: number;
+  logs: ExerciseLog[];
+  stopwatchAccumMs: number;
+  stopwatchRunning: boolean;
+  /** Epoch ms when the current stopwatch segment started, if running */
+  stopwatchSegmentStartEpoch: number | null;
+  /** Exercise FAB: stopwatch vs custom countdown */
+  exerciseTimerMode?: 'stopwatch' | 'countdown';
+  countdownInputMin?: string;
+  countdownInputSec?: string;
+  /** null = show target from inputs; number = paused or live remaining */
+  countdownRemainingSec?: number | null;
+  countdownRunning?: boolean;
+}
+
+export type AppView =
+  | 'dashboard'
+  | 'circuits'
+  | 'builder'
+  | 'active'
+  | 'history'
+  | 'stats'
+  | 'upload'
+  | 'program';
+
+/** One day in a multi-week program: contains all circuits for that day. */
+export interface ProgramWorkoutDay {
+  week: number;
+  day: number;
+  circuits: Circuit[];
+}
+
+/**
+ * A structured training program created from a CSV upload.
+ * Circuits inside the program are self-contained and not added to the global circuit library.
+ */
+export interface Program {
+  id: string;
+  name: string;
+  totalWeeks: number;
+  schedule: ProgramWorkoutDay[];
+  /** Days the user has finished at least once. Populated by the app; not part of the CSV. */
+  completedDays?: { week: number; day: number }[];
+}

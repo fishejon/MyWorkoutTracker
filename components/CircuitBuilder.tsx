@@ -7,6 +7,7 @@ import { Search, Plus, X, ChevronRight, Layers, ArrowLeft } from 'lucide-react';
 interface CircuitBuilderProps {
   initialCircuit?: Circuit | null;
   customExercises: CustomExercise[];
+  existingCategories: string[];
   onSaveCustomExercise: (ex: CustomExercise) => void;
   onSave: (circuit: Circuit) => void;
   onUpdate: (circuit: Circuit) => void;
@@ -16,12 +17,14 @@ interface CircuitBuilderProps {
 const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
   initialCircuit,
   customExercises,
+  existingCategories,
   onSaveCustomExercise,
   onSave,
   onUpdate,
   onCancel,
 }) => {
   const [name, setName] = useState(initialCircuit?.name ?? '');
+  const [category, setCategory] = useState(initialCircuit?.category ?? '');
   const [selectedExercises, setSelectedExercises] = useState<CircuitExercise[]>(initialCircuit?.exercises ?? []);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -31,6 +34,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
   // Sync state when opening builder for a different circuit
   useEffect(() => {
     setName(initialCircuit?.name ?? '');
+    setCategory(initialCircuit?.category ?? '');
     setSelectedExercises(initialCircuit?.exercises ?? []);
     setSelectedGroup(null);
     setSearchQuery('');
@@ -83,6 +87,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
       id: initialCircuit?.id ?? Date.now().toString(),
       name: name.trim(),
       exercises: selectedExercises,
+      ...(category.trim() ? { category: category.trim() } : {}),
     };
 
     if (isEditing) {
@@ -127,22 +132,52 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Name Input */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
-          <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Circuit Identity</label>
-          <input 
-            type="text" 
-            placeholder="e.g., Strength Day"
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-400"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+        {/* Name + Category */}
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-2">Circuit name</label>
+            <input
+              type="text"
+              placeholder="e.g., Strength Day"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-400"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-2">Category <span className="text-zinc-300">(optional)</span></label>
+            <input
+              type="text"
+              placeholder="e.g., Push, Legs, Cardio"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-all font-semibold text-slate-900 placeholder:text-slate-400"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
+            {existingCategories.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {existingCategories.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategory(cat)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      category === cat
+                        ? 'bg-zinc-900 text-white'
+                        : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Selected List */}
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Planned Exercises</h3>
+            <h3 className="text-xs font-medium text-zinc-400">Planned Exercises</h3>
           </div>
           
           {selectedExercises.length === 0 ? (
@@ -156,7 +191,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
                 <div key={ex.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm animate-in fade-in slide-in-from-top-2">
                   <div className="min-w-0">
                     <p className="font-bold text-slate-800 truncate text-sm">{ex.name}</p>
-                    <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-tighter">{ex.type}</p>
+                    <p className="text-[10px] text-sky-500 font-bold uppercase tracking-tighter">{ex.type}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center bg-slate-100 rounded-lg p-1 border border-slate-200">
@@ -178,10 +213,10 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
         {/* Library Section */}
         <div className="space-y-4 pt-4 border-t border-slate-200 pb-24">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Exercise Library</h3>
+            <h3 className="text-xs font-medium text-zinc-400">Exercise Library</h3>
             <button 
               onClick={() => setIsCustomMode(!isCustomMode)}
-              className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md flex items-center gap-1"
+              className="text-xs font-bold text-sky-500 bg-zinc-50 px-2 py-1 rounded-md flex items-center gap-1"
             >
               <Plus className="w-3 h-3" />
               Add Custom
@@ -189,7 +224,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
           </div>
 
           {isCustomMode && (
-            <div className="bg-indigo-600 p-4 rounded-2xl shadow-lg text-white space-y-4 animate-in zoom-in-95">
+            <div className="bg-zinc-900 p-4 rounded-2xl shadow-lg text-white space-y-4 animate-in zoom-in-95">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-black uppercase tracking-widest">New Custom Exercise</span>
                 <button onClick={() => setIsCustomMode(false)}><X className="w-4 h-4" /></button>
@@ -198,19 +233,19 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
                 autoFocus
                 type="text"
                 placeholder="Exercise name..."
-                className="w-full px-4 py-3 bg-indigo-700/50 border border-indigo-400/50 rounded-xl outline-none placeholder:text-indigo-300 font-semibold"
+                className="w-full px-4 py-3 bg-zinc-700/50 border border-zinc-600/50 rounded-xl outline-none placeholder:text-zinc-400 font-semibold"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
               />
               <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-200 block mb-2">Muscle group</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 block mb-2">Muscle group</span>
                 <div className="flex flex-wrap gap-2">
                   {EXERCISE_GROUPS.map(g => (
                     <button
                       key={g.muscleGroup}
                       type="button"
                       onClick={() => setCustomMuscleGroup(g.muscleGroup)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${customMuscleGroup === g.muscleGroup ? 'bg-white text-indigo-600 shadow-sm' : 'bg-indigo-500/50 text-indigo-100 hover:bg-indigo-500'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${customMuscleGroup === g.muscleGroup ? 'bg-white text-zinc-900 shadow-sm' : 'bg-zinc-700/60 text-zinc-200 hover:bg-zinc-600'}`}
                     >
                       {g.muscleGroup}
                     </button>
@@ -222,7 +257,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
                   <button
                     key={type}
                     onClick={() => setCustomType(type)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${customType === type ? 'bg-white text-indigo-600 shadow-sm' : 'bg-indigo-500/50 text-indigo-100 hover:bg-indigo-500'}`}
+                    className={`flex-1 py-2 rounded-lg text-xs font-medium capitalize transition-all ${customType === type ? 'bg-white text-zinc-900 shadow-sm' : 'bg-zinc-700/60 text-zinc-200 hover:bg-zinc-600'}`}
                   >
                     {type}
                   </button>
@@ -231,7 +266,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
               <button
                 onClick={addCustomExercise}
                 disabled={!customName.trim() || !customMuscleGroup}
-                className="w-full py-3 bg-white text-indigo-600 rounded-xl font-black shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-white text-zinc-900 rounded-xl font-semibold shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ADD TO CIRCUIT
               </button>
@@ -247,10 +282,10 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
                   <button
                     key={group.muscleGroup}
                     onClick={() => setSelectedGroup(group.muscleGroup)}
-                    className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center gap-2 hover:border-indigo-300 hover:bg-indigo-50 transition-all group active:scale-95"
+                    className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center text-center gap-2 hover:border-zinc-300 hover:bg-zinc-50 transition-all group active:scale-95"
                   >
                     <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center group-hover:bg-white transition-colors">
-                      <ChevronRight className="w-5 h-5 text-indigo-500" />
+                      <ChevronRight className="w-5 h-5 text-sky-500" />
                     </div>
                     <span className="text-sm font-bold text-slate-700">{group.muscleGroup}</span>
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">{total} Options</span>
@@ -267,14 +302,14 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
                 >
                   <ArrowLeft className="w-4 h-4" />
                 </button>
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">{selectedGroup}</h3>
+                <h3 className="text-sm font-semibold text-zinc-800">{selectedGroup}</h3>
               </div>
               <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text" 
                   placeholder={`Filter ${selectedGroup}...`}
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm text-slate-900"
+                  className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none shadow-sm text-slate-900"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -286,13 +321,13 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
                     <button
                       key={ex.id}
                       onClick={() => addExercise(ex)}
-                      className="w-full flex items-center justify-between p-4 text-left hover:bg-indigo-50 transition-colors group active:bg-indigo-100"
+                      className="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors group active:bg-zinc-100"
                     >
                       <div>
                         <p className="text-sm font-semibold text-slate-700">{ex.name}</p>
                         <p className="text-[10px] text-slate-400 font-bold uppercase">{ex.type}</p>
                       </div>
-                      <div className={`p-1.5 rounded-full transition-colors ${isSelected ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600'}`}>
+                      <div className={`p-1.5 rounded-full transition-colors ${isSelected ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-zinc-100 group-hover:text-sky-500'}`}>
                         <Plus className="w-4 h-4" />
                       </div>
                     </button>
@@ -310,9 +345,9 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
           <p className="text-sm text-amber-700 font-medium" role="alert">{saveValidationError}</p>
         )}
         <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">Cancel</button>
-          <button onClick={handleSave} disabled={!name.trim() || selectedExercises.length === 0} className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg disabled:opacity-50 transition-all active:scale-[0.98]">
-            {isEditing ? 'SAVE CHANGES' : 'CREATE CIRCUIT'}
+          <button onClick={onCancel} className="flex-1 py-3.5 bg-zinc-100 text-zinc-600 rounded-2xl font-medium">Cancel</button>
+          <button onClick={handleSave} disabled={!name.trim() || selectedExercises.length === 0} className="flex-[2] py-3.5 bg-zinc-900 text-white rounded-2xl font-semibold shadow-sm disabled:opacity-50 transition-all active:scale-[0.98]">
+            {isEditing ? 'Save Changes' : 'Create Circuit'}
           </button>
         </div>
       </div>

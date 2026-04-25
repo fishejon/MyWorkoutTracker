@@ -2,7 +2,7 @@ import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../serve
 import { ensureAppSchema, getSql } from '../../server/db.js';
 import { denormalizeWorkouts, normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
 import { WorkoutRow, RoundRow, ExerciseSetRow } from '../../server/workoutDataTransform.js';
-import { WorkoutSession, CustomExercise } from '../../types.js';
+import { WorkoutSession, CustomExercise, Program } from '../../types.js';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -53,13 +53,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Column might already exist or table doesn't exist yet - ignore
     }
 
-    // Get circuits, history, and custom exercises
+    // Get circuits, history, custom exercises, and programs
     const userDataRows = await sql<{
       circuits: unknown;
       history: unknown;
       custom_exercises?: unknown;
+      programs?: unknown;
     }[]>`
-      select circuits, history, custom_exercises
+      select circuits, history, custom_exercises, programs
       from user_data
       where sub = ${user.sub}
     `;
@@ -72,6 +73,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rawCustom = userDataRows.length > 0 && Array.isArray(userDataRows[0].custom_exercises)
       ? (userDataRows[0].custom_exercises as unknown[])
       : [];
+    // Validate programs: must be array of { id, name, totalWeeks, schedule }
+    const rawPrograms = userDataRows.length > 0 && Array.isArray(userDataRows[0].programs)
+      ? (userDataRows[0].programs as unknown[])
+      : [];
+    const programs = rawPrograms.filter((item): item is Program => {
+      if (!item || typeof item !== 'object') return false;
+      const o = item as Record<string, unknown>;
+      return (
+        typeof o.id === 'string' &&
+        typeof o.name === 'string' &&
+        typeof o.totalWeeks === 'number' &&
+        Array.isArray(o.schedule)
+      );
+    });
+
     const customExercises = rawCustom.filter((item): item is CustomExercise => {
       if (!item || typeof item !== 'object') return false;
       const o = item as Record<string, unknown>;
@@ -126,7 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Migrate old JSONB history to normalized tables
       try {
-        await sql.begin(async (tx) => {
+        await sql.begin(async (tx: any) => {
           for (const workoutSession of oldHistory) {
             const normalized = normalizeWorkoutSession(workoutSession, user.sub);
 
@@ -168,6 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           circuits,
           history: oldHistory, // Return old format if migration fails
           customExercises,
+          programs,
         });
         return;
       }
@@ -222,7 +239,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           `;
         }
         
-        res.status(200).json({ circuits, history, customExercises });
+        res.status(200).json({ circuits, history, customExercises, programs });
         return;
       } else {
         // Migration ran but no data was created - don't clear old data
@@ -241,10 +258,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // If we have old history but migration didn't run, return it
       if (oldHistory.length > 0) {
         if (isDev) console.log(`[Migration Debug] Returning old history format as fallback`);
-        res.status(200).json({ circuits, history: oldHistory, customExercises });
+        res.status(200).json({ circuits, history: oldHistory, customExercises, programs });
         return;
       }
-      res.status(200).json({ circuits, history: [], customExercises });
+      res.status(200).json({ circuits, history: [], customExercises, programs });
       return;
     }
 
@@ -293,6 +310,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       circuits,
       history,
       customExercises,
+      programs,
     });
   } catch (err) {
     console.error('data/get error', err);
