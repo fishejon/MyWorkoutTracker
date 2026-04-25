@@ -103,6 +103,14 @@ function serializeCircuitsSyncSignature(c: Circuit[]): string {
   );
 }
 
+/** Whole pounds with no decimal; fractional only when needed (e.g. 137.5). */
+function formatWeightDisplay(w: number): string {
+  if (!Number.isFinite(w) || w === 0) return '';
+  const r = Math.round(w * 100) / 100;
+  if (Number.isInteger(r)) return String(r);
+  return r.toFixed(2).replace(/\.?0+$/, '');
+}
+
 const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
   circuits,
   onFinish,
@@ -191,6 +199,9 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
   const [cdInputSec, setCdInputSec] = useState(() => initial.countdownInputSec);
   const [cdRemainingSec, setCdRemainingSec] = useState<number | null>(() => initial.countdownRemainingSec);
   const [cdRunning, setCdRunning] = useState(() => initial.countdownRunning);
+
+  /** Lets users type partial decimals (e.g. `137.`) without the controlled input snapping closed. */
+  const [weightDraftByKey, setWeightDraftByKey] = useState<Record<string, string>>({});
 
   const stateRef = useRef({
     circuitKey,
@@ -382,7 +393,15 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
     cdRemainingSec !== null ? cdRemainingSec : parseCountdownTargetSec(cdInputMin, cdInputSec);
 
   const updateLog = useCallback((logIdx: number, setIdx: number, field: 'value' | 'weight', val: string | number) => {
-    const numVal = typeof val === 'string' ? (val === '' ? 0 : parseFloat(val) || 0) : val;
+    const numVal =
+      typeof val === 'string'
+        ? val === '' || val === '.' || val === ','
+          ? 0
+          : (() => {
+              const n = parseFloat(val.replace(',', '.'));
+              return Number.isFinite(n) ? n : 0;
+            })()
+        : val;
 
     setLogs(prev => {
       const newLogs = [...prev];
@@ -816,9 +835,9 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
 
                             const wPh =
                               lastSet?.weight && lastSet.weight > 0
-                                ? String(lastSet.weight)
+                                ? formatWeightDisplay(lastSet.weight)
                                 : log.suggestedWeight && log.suggestedWeight > 0
-                                  ? String(log.suggestedWeight)
+                                  ? formatWeightDisplay(log.suggestedWeight)
                                   : '·';
                             const vPh =
                               lastSet?.value && lastSet.value > 0
@@ -828,17 +847,38 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
                                   : '·';
 
                             if (log.type === 'weight') {
+                              const weightKey = `${logIdx}-${si}`;
+                              const weightDraft = weightDraftByKey[weightKey];
+                              const weightDisplay =
+                                weightDraft !== undefined
+                                  ? weightDraft
+                                  : set.weight === 0 || set.weight === undefined
+                                    ? ''
+                                    : formatWeightDisplay(set.weight);
                               return (
                                 <React.Fragment key={si}>
                                   <td className="px-1 py-3 border-l border-slate-100">
                                     <input
                                       type="text"
                                       inputMode="decimal"
+                                      autoComplete="off"
                                       pattern="[0-9]*[.,]?[0-9]*"
-                                      className="font-numeric w-12 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-blue-600 focus:bg-white transition-all text-center block mx-auto"
+                                      className="font-numeric min-w-[3.25rem] w-14 h-11 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-semibold text-zinc-900 placeholder:text-zinc-300 outline-none focus:border-blue-600 focus:bg-white transition-all text-center block mx-auto"
                                       placeholder={wPh}
-                                      value={set.weight === 0 ? '' : set.weight}
-                                      onChange={e => updateLog(logIdx, si, 'weight', e.target.value)}
+                                      value={weightDisplay}
+                                      onChange={(e) => {
+                                        let raw = e.target.value.replace(',', '.');
+                                        if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return;
+                                        setWeightDraftByKey((prev) => ({ ...prev, [weightKey]: raw }));
+                                        updateLog(logIdx, si, 'weight', raw);
+                                      }}
+                                      onBlur={() => {
+                                        setWeightDraftByKey((prev) => {
+                                          const next = { ...prev };
+                                          delete next[weightKey];
+                                          return next;
+                                        });
+                                      }}
                                     />
                                   </td>
                                   <td className="px-1 py-3">

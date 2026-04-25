@@ -186,7 +186,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Save workouts in normalized format using transaction.
     // If client sends empty history, do not wipe server (avoid accidental data loss).
     if (deduplicatedHistory.length > 0) {
-      await sql.begin(async (tx) => {
+      await sql.begin(async (tx: any) => {
         // Delete existing workouts for this user (to handle updates)
         // Cascade delete will automatically remove rounds and exercise_sets
         await tx`

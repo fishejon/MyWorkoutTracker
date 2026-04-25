@@ -106,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Perform migration
-    await sql.begin(async (tx) => {
+    await sql.begin(async (tx: any) => {
       for (const workoutSession of oldHistory) {
         const normalized = normalizeWorkoutSession(workoutSession, user.sub);
 

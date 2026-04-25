@@ -78,7 +78,15 @@ export interface ActiveWorkoutDraft {
   countdownRunning?: boolean;
 }
 
-export type AppView = 'dashboard' | 'builder' | 'active' | 'history' | 'stats' | 'upload' | 'program';
+export type AppView =
+  | 'dashboard'
+  | 'circuits'
+  | 'builder'
+  | 'active'
+  | 'history'
+  | 'stats'
+  | 'upload'
+  | 'program';
 
 /** One day in a multi-week program: contains all circuits for that day. */
 export interface ProgramWorkoutDay {

@@ -142,7 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Migrate old JSONB history to normalized tables
       try {
-        await sql.begin(async (tx) => {
+        await sql.begin(async (tx: any) => {
           for (const workoutSession of oldHistory) {
             const normalized = normalizeWorkoutSession(workoutSession, user.sub);
 
