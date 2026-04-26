@@ -53,7 +53,11 @@ type AuthStatus = 'checking' | 'unauth' | 'authed';
 
 const dayCompleteKey = (d: { week: number; day: number }) => `${d.week}:${d.day}`;
 
-/** Merge program day completions from localStorage into server programs (fixes lost checkmarks after refresh). */
+/**
+ * Merge local program data into server programs.
+ * - Preserves local completion checkmarks for matching program IDs.
+ * - Appends local-only programs that do not yet exist on the server.
+ */
 function mergeProgramCompletionsFromLocal(
   server: Program[],
   local: Program[]
@@ -69,7 +73,14 @@ function mergeProgramCompletionsFromLocal(
     hadExtras = true;
     return { ...sp, completedDays: [...(sp.completedDays ?? []), ...extras] };
   });
-  return { programs, hadExtras };
+
+  const serverIds = new Set(server.map(p => p.id));
+  const localOnlyPrograms = local.filter(p => !serverIds.has(p.id));
+  if (localOnlyPrograms.length > 0) {
+    hadExtras = true;
+  }
+
+  return { programs: [...programs, ...localOnlyPrograms], hadExtras };
 }
 
 const App: React.FC = () => {
@@ -345,6 +356,7 @@ const App: React.FC = () => {
           setDataError('Couldn’t load latest data. Showing cached.');
           setCircuits(localCircuits);
           setHistory(localHistory);
+          setPrograms(getPrograms());
           setView('dashboard');
         }
       }
