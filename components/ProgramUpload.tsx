@@ -197,12 +197,18 @@ const ProgramUpload: React.FC<ProgramUploadProps> = ({ onImportCircuits, onImpor
     if (!preview) return;
 
     if (!preview.isMultiWeek) {
-      // Single-day: create standalone circuits
+      // Single-day: create a one-day Program so it appears in "Programs".
       const circuits: Circuit[] = [];
       preview.circuitMap.forEach((rows, name) => {
         circuits.push(buildCircuit(name, rows));
       });
-      onImportCircuits(circuits);
+      const singleDayProgram: Program = {
+        id: `prog-${Date.now()}`,
+        name: programName.trim() || preview.programName,
+        totalWeeks: 1,
+        schedule: [{ week: 1, day: 1, circuits }],
+      };
+      onImportProgram(singleDayProgram);
       return;
     }
 
@@ -413,7 +419,7 @@ const ProgramUpload: React.FC<ProgramUploadProps> = ({ onImportCircuits, onImpor
           disabled={!preview}
             className="flex-[2] py-4 bg-zinc-900 text-white rounded-2xl font-semibold shadow-sm disabled:opacity-40 transition-all active:scale-[0.98]"
           >
-            {preview?.isMultiWeek ? 'IMPORT PROGRAM' : 'ADD CIRCUITS'}
+            IMPORT PROGRAM
           </button>
         </div>
       </div>
