@@ -158,6 +158,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     }).length;
   }, [history]);
 
+  // Backward compatibility: older single-day CSV imports were added as standalone circuits.
+  // Surface them in this section so users can still find and start those uploaded workouts.
+  const uploadedWorkoutCircuits = useMemo(() => {
+    const programNames = new Set(programs.map(p => p.name.trim().toLowerCase()));
+    return circuits.filter(c => c.id.startsWith('csv-') && !programNames.has(c.name.trim().toLowerCase()));
+  }, [circuits, programs]);
+
   return (
     <div className="p-4 space-y-5">
 
@@ -237,7 +244,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         className={`space-y-3 ${tourSectionClass(highlightTour === 'programs')}`}
       >
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold text-slate-800">Programs</h3>
+          <h3 className="text-sm font-semibold text-slate-800">Imported programs and workouts</h3>
           <div className="flex items-center gap-3">
             <a
               href="/program-template.csv"
@@ -253,13 +260,13 @@ const Dashboard: React.FC<DashboardProps> = ({
             </button>
           </div>
         </div>
-        {programs.length === 0 ? (
+        {programs.length === 0 && uploadedWorkoutCircuits.length === 0 ? (
           <button
             onClick={onImportCSV}
             className="w-full text-center py-6 bg-white rounded-2xl border border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-600 transition-all"
           >
             <BookOpen className="w-7 h-7 mx-auto mb-1.5 opacity-40" />
-            <p className="text-xs font-medium">Import a CSV to create a program</p>
+            <p className="text-xs font-medium">Import a CSV to create an item here</p>
             <p className="text-[10px] mt-0.5 opacity-60">Single day or multi-week plans</p>
           </button>
         ) : (
@@ -296,6 +303,27 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               );
             })}
+
+            {uploadedWorkoutCircuits.map(circuit => (
+              <div
+                key={circuit.id}
+                className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all flex items-center justify-between cursor-pointer"
+                onClick={() => onStart([circuit])}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-slate-100 rounded-xl flex-shrink-0">
+                    <BookOpen className="w-4 h-4 text-slate-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 text-sm truncate">{circuit.name}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      Uploaded workout · {circuit.exercises.length} exercises
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 ml-2 flex-shrink-0" />
+              </div>
+            ))}
           </div>
         )}
       </div>
