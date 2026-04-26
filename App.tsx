@@ -452,10 +452,24 @@ const App: React.FC = () => {
   };
 
   const handleImportProgram = (program: Program) => {
-    const updated = [...programs, program];
-    setPrograms(updated);
-    savePrograms(updated);
-    void persistUserData(circuits, history, customExercises, updated);
+    const updatedPrograms = [...programs, program];
+
+    // Fail-safe: keep single-day imported workouts discoverable as uploaded circuits.
+    const isSingleDayImport = program.totalWeeks === 1 && program.schedule.length === 1;
+    const importedCircuits = isSingleDayImport ? program.schedule[0].circuits : [];
+    const existingCircuitIds = new Set(circuits.map(c => c.id));
+    const newCircuits = importedCircuits.filter(c => !existingCircuitIds.has(c.id));
+    const updatedCircuits = newCircuits.length > 0 ? [...circuits, ...newCircuits] : circuits;
+
+    setPrograms(updatedPrograms);
+    savePrograms(updatedPrograms);
+
+    if (newCircuits.length > 0) {
+      setCircuits(updatedCircuits);
+      saveCircuits(updatedCircuits);
+    }
+
+    void persistUserData(updatedCircuits, history, customExercises, updatedPrograms);
     setView('dashboard');
   };
 
