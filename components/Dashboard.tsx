@@ -161,9 +161,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   // Backward compatibility: older single-day CSV imports were added as standalone circuits.
   // Surface them in this section so users can still find and start those uploaded workouts.
   const uploadedWorkoutCircuits = useMemo(() => {
-    const programNames = new Set(programs.map(p => p.name.trim().toLowerCase()));
-    return circuits.filter(c => c.id.startsWith('csv-') && !programNames.has(c.name.trim().toLowerCase()));
-  }, [circuits, programs]);
+    return circuits.filter(c => c.id.startsWith('csv-'));
+  }, [circuits]);
 
   return (
     <div className="p-4 space-y-5">

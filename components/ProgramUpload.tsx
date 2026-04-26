@@ -166,6 +166,8 @@ const ProgramUpload: React.FC<ProgramUploadProps> = ({ onImportCircuits, onImpor
   const [preview, setPreview] = useState<ParsedPreview | null>(null);
   const [programName, setProgramName] = useState('');
 
+  const createProgramId = () => `prog-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   const handleFile = (file: File) => {
     setFileName(file.name);
     setParseError(null);
@@ -203,7 +205,7 @@ const ProgramUpload: React.FC<ProgramUploadProps> = ({ onImportCircuits, onImpor
         circuits.push(buildCircuit(name, rows));
       });
       const singleDayProgram: Program = {
-        id: `prog-${Date.now()}`,
+        id: createProgramId(),
         name: programName.trim() || preview.programName,
         totalWeeks: 1,
         schedule: [{ week: 1, day: 1, circuits }],
@@ -227,7 +229,7 @@ const ProgramUpload: React.FC<ProgramUploadProps> = ({ onImportCircuits, onImpor
     }
 
     const program: Program = {
-      id: `prog-${Date.now()}`,
+      id: createProgramId(),
       name: programName.trim() || preview.programName,
       totalWeeks: preview.totalWeeks,
       schedule,
