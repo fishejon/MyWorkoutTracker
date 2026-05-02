@@ -25,6 +25,8 @@ interface ActiveWorkoutProps {
   customExercises: CustomExercise[];
   existingCategories: string[];
   onSaveCustomExercise: (ex: CustomExercise) => void;
+  /** When true, shows an amber indicator: session expired but local draft saving is still active. */
+  isSessionExpired?: boolean;
 }
 
 function buildFreshLogs(circuits: Circuit[], workoutHistory: WorkoutSession[]): ExerciseLog[] {
@@ -121,6 +123,7 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
   customExercises,
   existingCategories,
   onSaveCustomExercise,
+  isSessionExpired,
 }) => {
   const workoutHistory = history ?? getHistory();
   const circuitKey = useMemo(() => activeWorkoutCircuitKey(circuits), [circuits]);
@@ -677,6 +680,11 @@ const ActiveWorkout: React.FC<ActiveWorkoutProps> = ({
           <ChevronLeft />
         </button>
         <span className="text-xs font-medium text-white/45 truncate text-center flex-1 px-2">Session</span>
+        {isSessionExpired && (
+          <span className="flex-shrink-0 text-[10px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-1 rounded-lg">
+            Sync offline
+          </span>
+        )}
         <button
           onClick={handleFinish}
           className="bg-white text-zinc-900 font-semibold text-xs px-4 py-2 rounded-xl active:scale-95 transition-transform flex-shrink-0"

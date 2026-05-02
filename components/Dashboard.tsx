@@ -1,9 +1,10 @@
 
-import React, { useMemo, useState } from 'react';
-import { Circuit, WorkoutSession, Program } from '../types';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import { Circuit, WorkoutSession, Program, SavedWorkout } from '../types';
 import {
   Play, Trash2, Upload,
-  BookOpen, ChevronLeft, ChevronRight, Flame, Clock, Download, RotateCcw, X,
+  BookOpen, ChevronLeft, ChevronRight, Flame, Clock, Download,
+  RotateCcw, X, BookMarked, Pencil, Plus, Check,
 } from 'lucide-react';
 
 export type DashboardTourSection = 'today' | 'calendar' | 'stats' | 'programs';
@@ -26,6 +27,11 @@ interface DashboardProps {
   resumableCircuits?: Circuit[] | null;
   onResume?: () => void;
   onDismissResume?: () => void;
+  /** Saved workouts shown in the Home screen section below Programs. */
+  savedWorkouts?: SavedWorkout[];
+  onCreateSavedWorkout?: (workout: SavedWorkout) => void;
+  onUpdateSavedWorkout?: (workout: SavedWorkout) => void;
+  onDeleteSavedWorkout?: (id: string) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -135,6 +141,112 @@ const WorkoutCalendar: React.FC<{ history: WorkoutSession[] }> = ({ history }) =
   );
 };
 
+// ─── Workout Modal ────────────────────────────────────────────────────────────
+
+interface WorkoutModalProps {
+  circuits: Circuit[];
+  initial?: SavedWorkout;
+  onSave: (name: string, circuitIds: string[]) => void;
+  onClose: () => void;
+}
+
+const WorkoutModal: React.FC<WorkoutModalProps> = ({ circuits, initial, onSave, onClose }) => {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initial?.circuitIds ?? []));
+  const [error, setError] = useState('');
+  const nameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { nameRef.current?.focus(); }, []);
+
+  const toggle = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleSave = () => {
+    const trimmed = name.trim();
+    if (!trimmed) { setError('Give this workout a name.'); return; }
+    if (selectedIds.size === 0) { setError('Select at least one circuit.'); return; }
+    onSave(trimmed, [...selectedIds]);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100 flex-shrink-0">
+          <h2 className="text-base font-bold text-slate-900">
+            {initial ? 'Edit workout' : 'New saved workout'}
+          </h2>
+          <button type="button" onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg" aria-label="Close">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5" htmlFor="sw-name-dash">Workout name</label>
+            <input
+              ref={nameRef}
+              id="sw-name-dash"
+              type="text"
+              value={name}
+              onChange={e => { setName(e.target.value); setError(''); }}
+              placeholder="e.g. Push Day, Full Body A…"
+              className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-slate-600 mb-2">
+              Circuits <span className="font-normal text-slate-400">({selectedIds.size} selected)</span>
+            </p>
+            {circuits.length === 0 ? (
+              <p className="text-sm text-slate-400 py-4 text-center">No circuits yet. Build one first.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {circuits.map(circuit => {
+                  const selected = selectedIds.has(circuit.id);
+                  return (
+                    <button key={circuit.id} type="button" onClick={() => toggle(circuit.id)}
+                      className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl border text-left transition-colors ${
+                        selected ? 'border-blue-500 bg-blue-50' : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                        selected ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
+                      }`}>
+                        {selected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-800 truncate">{circuit.name}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {circuit.exercises.length} exercise{circuit.exercises.length !== 1 ? 's' : ''}
+                          {circuit.category ? ` · ${circuit.category}` : ''}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="px-5 pb-5 pt-3 border-t border-slate-100 flex-shrink-0 space-y-2">
+          {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="flex-1 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:border-slate-300 transition-colors">Cancel</button>
+            <button type="button" onClick={handleSave} className="flex-1 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95">
+              {initial ? 'Save changes' : 'Save workout'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 const tourSectionClass = (active: boolean) =>
@@ -146,6 +258,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   circuits, history, programs, onStart, onDeleteProgram,
   onEdit, onNew, onImportCSV, onOpenProgram, tourIds, highlightTour,
   resumableCircuits, onResume, onDismissResume,
+  savedWorkouts, onCreateSavedWorkout, onUpdateSavedWorkout, onDeleteSavedWorkout,
 }) => {
   const streak = useMemo(() => calcStreak(history), [history]);
   const lastSession = history[0] ?? null;
@@ -163,41 +276,87 @@ const Dashboard: React.FC<DashboardProps> = ({
     }).length;
   }, [history]);
 
+  // Saved workout modal + confirm state
+  const [swModal, setSwModal] = useState<'create' | 'edit' | null>(null);
+  const [swEditing, setSwEditing] = useState<SavedWorkout | null>(null);
+  const [swConfirmDeleteId, setSwConfirmDeleteId] = useState<string | null>(null);
+  // Resume discard confirm
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  const handleSwSave = (name: string, circuitIds: string[]) => {
+    if (swModal === 'edit' && swEditing) {
+      onUpdateSavedWorkout?.({ ...swEditing, name, circuitIds });
+    } else {
+      onCreateSavedWorkout?.({
+        id: `sw_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        name,
+        circuitIds,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    setSwModal(null);
+    setSwEditing(null);
+  };
+
+  const handleSwStart = (w: SavedWorkout) => {
+    const resolved = w.circuitIds
+      .map(id => circuits.find(c => c.id === id))
+      .filter((c): c is Circuit => !!c);
+    if (resolved.length > 0) onStart(resolved);
+  };
+
   return (
     <div className="p-4 space-y-5">
 
       {/* Resume in-progress workout banner */}
       {resumableCircuits && resumableCircuits.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="p-2 bg-amber-100 rounded-xl flex-shrink-0 mt-0.5">
-                <RotateCcw className="w-4 h-4 text-amber-700" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-amber-900">Workout in progress</p>
-                <p className="text-xs text-amber-700 mt-0.5 truncate">
-                  {resumableCircuits.map(c => c.name).join(' · ')}
-                </p>
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-amber-100 rounded-xl flex-shrink-0 mt-0.5">
+              <RotateCcw className="w-4 h-4 text-amber-700" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-900">Unfinished workout — saved on this device</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {resumableCircuits.map(c => c.name).join(' · ')} · Not yet recorded
+              </p>
+            </div>
+          </div>
+          {confirmDiscard ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-amber-800 font-medium">Your logged sets will be permanently lost. Discard?</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setConfirmDiscard(false)}
+                  className="flex-1 py-2 border border-amber-300 rounded-xl text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+                >
+                  Keep it
+                </button>
+                <button type="button" onClick={() => { setConfirmDiscard(false); onDismissResume?.(); }}
+                  className="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold transition-colors"
+                >
+                  Yes, discard
+                </button>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onDismissResume}
-              className="p-1 text-amber-500 hover:text-amber-700 flex-shrink-0"
-              aria-label="Discard workout"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={onResume}
-            className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Resume Workout
-          </button>
+          ) : (
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={onResume}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold transition-colors active:scale-95"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Resume Workout
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDiscard(true)}
+                className="px-4 py-2.5 border border-amber-300 hover:bg-amber-100 text-amber-800 rounded-xl text-sm font-semibold transition-colors"
+              >
+                Discard
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -340,7 +499,113 @@ const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
+      {/* Saved Workouts */}
+      {savedWorkouts !== undefined && (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-slate-800">Saved Workouts</h3>
+            <button
+              type="button"
+              onClick={() => { setSwEditing(null); setSwModal('create'); }}
+              className="bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New
+            </button>
+          </div>
+          {savedWorkouts.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => { setSwEditing(null); setSwModal('create'); }}
+              className="w-full text-center py-6 bg-white rounded-2xl border border-dashed border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-600 transition-all"
+            >
+              <BookMarked className="w-7 h-7 mx-auto mb-1.5 opacity-40" />
+              <p className="text-xs font-medium">Save a workout for quick access</p>
+              <p className="text-[10px] mt-0.5 opacity-60">Pick circuits and tap Start next time</p>
+            </button>
+          ) : (
+            <div className="grid gap-2">
+              {savedWorkouts.map(w => {
+                const resolved = w.circuitIds
+                  .map(id => circuits.find(c => c.id === id))
+                  .filter((c): c is Circuit => !!c);
+                const canStart = resolved.length > 0;
+                return (
+                  <div key={w.id} className="bg-white p-3.5 rounded-xl border border-slate-200 hover:border-slate-300 transition-all">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-slate-900 text-sm truncate">{w.name}</p>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {resolved.map(c => (
+                            <span key={c.id} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-[10px] font-medium">{c.name}</span>
+                          ))}
+                          {resolved.length < w.circuitIds.length && (
+                            <span className="text-[10px] text-amber-600 font-medium">· some circuits deleted</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <button type="button" onClick={() => { setSwEditing(w); setSwModal('edit'); }}
+                          className="p-1.5 text-slate-300 hover:text-slate-600 transition-colors" aria-label={`Edit ${w.name}`}>
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button type="button" onClick={() => setSwConfirmDeleteId(w.id)}
+                          className="p-1.5 text-slate-300 hover:text-red-500 transition-colors" aria-label={`Delete ${w.name}`}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => canStart && handleSwStart(w)}
+                          disabled={!canStart}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                            canStart ? 'bg-blue-600 hover:bg-blue-700 text-white active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          }`}
+                        >
+                          <Play className="w-3 h-3 fill-current" />
+                          Start
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="h-4" />
+
+      {/* Saved workout create/edit modal */}
+      {(swModal === 'create' || swModal === 'edit') && (
+        <WorkoutModal
+          circuits={circuits}
+          initial={swModal === 'edit' ? swEditing ?? undefined : undefined}
+          onSave={handleSwSave}
+          onClose={() => { setSwModal(null); setSwEditing(null); }}
+        />
+      )}
+
+      {/* Saved workout delete confirm */}
+      {swConfirmDeleteId && (() => {
+        const w = savedWorkouts?.find(x => x.id === swConfirmDeleteId);
+        if (!w) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setSwConfirmDeleteId(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
+              <p className="text-sm font-semibold text-slate-900 mb-1">Delete "{w.name}"?</p>
+              <p className="text-xs text-slate-500 mb-5">This cannot be undone.</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setSwConfirmDeleteId(null)}
+                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:border-slate-300 transition-colors">Cancel</button>
+                <button type="button" onClick={() => { onDeleteSavedWorkout?.(w.id); setSwConfirmDeleteId(null); }}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-colors">Delete</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

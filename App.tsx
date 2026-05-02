@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus, Layers, BookMarked } from 'lucide-react';
+import { useGoogleOneTapLogin } from '@react-oauth/google';
+import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus, Layers } from 'lucide-react';
 import { AppView, Circuit, WorkoutSession, CustomExercise, Program, SavedWorkout } from './types';
 import {
   getCircuits,
@@ -44,7 +45,19 @@ function isTokenExpired(token: string): boolean {
     if (!payload.exp) return false;
     return payload.exp < Math.floor(Date.now() / 1000);
   } catch {
-    return false; // unparseable — treat as valid and let the server reject it
+    return false;
+  }
+}
+
+/** True when the token will expire within `bufferSec` seconds (default 5 min). */
+function isTokenNearlyExpired(token: string, bufferSec = 300): boolean {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64)) as { exp?: number };
+    if (!payload.exp) return false;
+    return payload.exp < Math.floor(Date.now() / 1000) + bufferSec;
+  } catch {
+    return false;
   }
 }
 
@@ -91,11 +104,15 @@ const App: React.FC = () => {
   const [viewingProgram, setViewingProgram] = useState<Program | null>(null);
   const [idToken, setIdToken] = useState<string | null>(() => {
     try {
-      return sessionStorage.getItem(ID_TOKEN_STORAGE_KEY);
+      return localStorage.getItem(ID_TOKEN_STORAGE_KEY);
     } catch {
       return null;
     }
   });
+  /** True when we should attempt a silent One-Tap token renewal. */
+  const [requestTokenRenewal, setRequestTokenRenewal] = useState(false);
+  /** Success message shown after a workout is saved locally when the session is expired. */
+  const [syncOfflineMessage, setSyncOfflineMessage] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking');
   const [authError, setAuthError] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -134,10 +151,12 @@ const App: React.FC = () => {
     setEditingProgramCircuit(null);
     setSavedWorkouts([]);
     setResumableCircuits(null);
+    setSyncOfflineMessage(null);
+    setRequestTokenRenewal(false);
     setView('dashboard');
 
     try {
-      sessionStorage.removeItem(ID_TOKEN_STORAGE_KEY);
+      localStorage.removeItem(ID_TOKEN_STORAGE_KEY);
     } catch {
       // ignore
     }
@@ -167,7 +186,17 @@ const App: React.FC = () => {
 
     if (!idToken) {
       setAuthStatus('unauth');
-      // Do not clear authError here; it may contain the reason verification failed.
+      setUser(null);
+      setStorageNamespace(null);
+      return;
+    }
+
+    // Short-circuit: if the stored token is already expired, silently clear it
+    // rather than hitting the server with a known-bad token.
+    if (isTokenExpired(idToken)) {
+      try { localStorage.removeItem(ID_TOKEN_STORAGE_KEY); } catch { /* ignore */ }
+      setIdToken(null);
+      setAuthStatus('unauth');
       setUser(null);
       setStorageNamespace(null);
       return;
@@ -397,13 +426,46 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authStatus, idToken]);
 
-  // Once re-authentication completes, clear the pending session indicator.
-  // The on-load merge logic above already handles syncing the localStorage session to the server.
+  // Once re-authentication completes, clear the pending session indicator and the sync-offline banner.
   useEffect(() => {
     if (authStatus === 'authed' && pendingSession) {
       setPendingSession(null);
     }
+    if (authStatus === 'authed') {
+      setSyncOfflineMessage(null);
+      setRequestTokenRenewal(false);
+    }
   }, [authStatus, pendingSession]);
+
+  // Silent One-Tap token renewal: check every 60s; trigger when token is within 5 min of expiry.
+  useEffect(() => {
+    if (authStatus !== 'authed' || !idToken || !hasGoogleClientId) return;
+    const check = () => {
+      if (isTokenNearlyExpired(idToken)) setRequestTokenRenewal(true);
+    };
+    check(); // run immediately in case token is already nearly expired
+    const id = window.setInterval(check, 60_000);
+    return () => window.clearInterval(id);
+  }, [authStatus, idToken, hasGoogleClientId]);
+
+  // Silent One-Tap renewal hook — only fires outside of active workout to avoid interruption.
+  useGoogleOneTapLogin({
+    onSuccess: (credentialResponse) => {
+      const token = credentialResponse.credential;
+      if (!token) return;
+      setRequestTokenRenewal(false);
+      setIdToken(token);
+      try { localStorage.setItem(ID_TOKEN_STORAGE_KEY, token); } catch { /* ignore */ }
+      void postAuthEvent('login', token);
+    },
+    onError: () => {
+      // Silent failure — user will see the sign-in banner if needed.
+      setRequestTokenRenewal(false);
+    },
+    disabled: !hasGoogleClientId || !requestTokenRenewal || authStatus !== 'authed' || view === 'active',
+    cancel_on_tap_outside: false,
+    auto_select: true,
+  });
 
   const handleCreateCircuit = (newCircuit: Circuit) => {
     const updated = [...circuits, newCircuit];
@@ -542,7 +604,8 @@ const App: React.FC = () => {
       setHistory(prev => dedupeWorkoutHistoryByContent([session, ...prev]));
       setActiveCircuits([]);
       setView(viewingProgram ? 'program' : 'history');
-      setDataError('Session expired — workout saved locally and will sync on next sign-in.');
+      // Show a reassuring success banner (not an error) — the workout IS saved.
+      setSyncOfflineMessage('Workout recorded — will sync when you sign back in.');
       return;
     }
 
@@ -674,7 +737,7 @@ const App: React.FC = () => {
               setEditingCircuit(null);
               setView('builder');
             }}
-          onImportCSV={() => setView('upload')}
+            onImportCSV={() => setView('upload')}
             onOpenProgram={(program) => {
               setViewingProgram(program);
               setView('program');
@@ -682,6 +745,10 @@ const App: React.FC = () => {
             resumableCircuits={resumableCircuits}
             onResume={handleResumeWorkout}
             onDismissResume={handleDismissResume}
+            savedWorkouts={savedWorkouts}
+            onCreateSavedWorkout={handleCreateSavedWorkout}
+            onUpdateSavedWorkout={handleUpdateSavedWorkout}
+            onDeleteSavedWorkout={handleDeleteSavedWorkout}
           />
         );
       case 'circuits':
@@ -742,35 +809,23 @@ const App: React.FC = () => {
           );
         }
         return (
-          <>
-            <ActiveWorkout
-              key={activeWorkoutMountId}
-              circuits={activeCircuits}
-              libraryCircuits={circuits}
-              onCircuitsChange={setActiveCircuits}
-              customExercises={customExercises}
-              existingCategories={existingCategories}
-              onSaveCustomExercise={handleSaveCustomExercise}
-              history={history}
-              onFinish={handleFinishWorkout}
-              onCancel={exitActiveWorkout}
-            />
-          </>
+          <ActiveWorkout
+            key={activeWorkoutMountId}
+            circuits={activeCircuits}
+            libraryCircuits={circuits}
+            onCircuitsChange={setActiveCircuits}
+            customExercises={customExercises}
+            existingCategories={existingCategories}
+            onSaveCustomExercise={handleSaveCustomExercise}
+            history={history}
+            onFinish={handleFinishWorkout}
+            onCancel={exitActiveWorkout}
+            isSessionExpired={!!idToken && isTokenExpired(idToken)}
+          />
         );
       }
       case 'history':
         return <HistoryView history={history} onDelete={handleDeleteSession} />;
-      case 'workouts':
-        return (
-          <SavedWorkoutsView
-            savedWorkouts={savedWorkouts}
-            circuits={circuits}
-            onStart={handleStartWorkout}
-            onCreate={handleCreateSavedWorkout}
-            onUpdate={handleUpdateSavedWorkout}
-            onDelete={handleDeleteSavedWorkout}
-          />
-        );
       case 'stats':
         return <StatsView history={history} customExercises={customExercises} />;
       case 'upload':
@@ -851,6 +906,10 @@ const App: React.FC = () => {
             resumableCircuits={resumableCircuits}
             onResume={handleResumeWorkout}
             onDismissResume={handleDismissResume}
+            savedWorkouts={savedWorkouts}
+            onCreateSavedWorkout={handleCreateSavedWorkout}
+            onUpdateSavedWorkout={handleUpdateSavedWorkout}
+            onDeleteSavedWorkout={handleDeleteSavedWorkout}
           />
         );
     }
@@ -882,13 +941,7 @@ const App: React.FC = () => {
           setAuthError(null);
           setIdToken(token);
           setAuthStatus('checking');
-
-          try {
-            sessionStorage.setItem(ID_TOKEN_STORAGE_KEY, token);
-          } catch {
-            // ignore
-          }
-
+          try { localStorage.setItem(ID_TOKEN_STORAGE_KEY, token); } catch { /* ignore */ }
           void postAuthEvent('login', token);
         }}
         onGoogleError={() => {
@@ -956,13 +1009,20 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {syncOfflineMessage && (
+        <div className="flex-shrink-0 px-4 py-2 bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-sm font-medium flex items-center justify-between gap-2">
+          <span>✓ {syncOfflineMessage}</span>
+          <button type="button" onClick={() => setSyncOfflineMessage(null)} className="text-emerald-600 hover:text-emerald-800 font-bold" aria-label="Dismiss">×</button>
+        </div>
+      )}
+
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto pb-32">
         {renderView()}
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-zinc-200/60 z-50 grid grid-cols-6 items-end pt-2 pb-[calc(0.65rem+var(--sab))] px-1">
+      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-zinc-200/60 z-50 grid grid-cols-5 items-end pt-2 pb-[calc(0.65rem+var(--sab))] px-1">
         <button
           type="button"
           onClick={() => setView('dashboard')}
@@ -1025,16 +1085,6 @@ const App: React.FC = () => {
           <span className="text-[10px] font-medium">Stats</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setView('workouts')}
-          className={`flex flex-col items-center justify-end gap-1 pb-1 min-h-[52px] transition-colors ${
-            view === 'workouts' ? 'text-blue-600' : 'text-zinc-400 hover:text-zinc-600'
-          }`}
-        >
-          <BookMarked className="w-5 h-5" />
-          <span className="text-[10px] font-medium">Workouts</span>
-        </button>
       </nav>
     </div>
   );
