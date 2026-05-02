@@ -78,6 +78,15 @@ export interface ActiveWorkoutDraft {
   countdownRunning?: boolean;
 }
 
+/** A named collection of circuits saved for future use (not yet started). */
+export interface SavedWorkout {
+  id: string;
+  name: string;
+  /** IDs of circuits from the user's library included in this workout. */
+  circuitIds: string[];
+  createdAt: string;
+}
+
 export type AppView =
   | 'dashboard'
   | 'circuits'
@@ -86,7 +95,8 @@ export type AppView =
   | 'history'
   | 'stats'
   | 'upload'
-  | 'program';
+  | 'program'
+  | 'workouts';
 
 /** One day in a multi-week program: contains all circuits for that day. */
 export interface ProgramWorkoutDay {

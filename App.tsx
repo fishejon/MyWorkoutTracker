@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus, Layers } from 'lucide-react';
-import { AppView, Circuit, WorkoutSession, CustomExercise, Program } from './types';
+import { Home, History as HistoryIcon, BarChart3, Dumbbell, Plus, Layers, BookMarked } from 'lucide-react';
+import { AppView, Circuit, WorkoutSession, CustomExercise, Program, SavedWorkout } from './types';
 import {
   getCircuits,
   getHistory,
@@ -11,6 +11,11 @@ import {
   savePrograms,
   fixUtcMidnightDate,
   saveHistory,
+  getSavedWorkouts,
+  saveSavedWorkouts,
+  getActiveWorkoutDraft,
+  clearActiveWorkoutDraft,
+  activeWorkoutCircuitKey,
 } from './services/storage';
 import {
   dedupeWorkoutHistoryByContent,
@@ -24,6 +29,7 @@ import HistoryView from './components/HistoryView';
 import StatsView from './components/StatsView';
 import ProgramUpload from './components/ProgramUpload';
 import ProgramView from './components/ProgramView';
+import SavedWorkoutsView from './components/SavedWorkoutsView';
 import LandingPage from './components/LandingPage';
 import { ViewErrorBoundary } from './components/ViewErrorBoundary';
 import { cloneCircuitWithNewId } from './services/circuitClone';
@@ -102,6 +108,9 @@ const App: React.FC = () => {
   const [editingProgramCircuit, setEditingProgramCircuit] = useState<{
     programId: string; week: number; day: number; circuitIdx: number; circuit: Circuit;
   } | null>(null);
+  const [savedWorkouts, setSavedWorkouts] = useState<SavedWorkout[]>(() => getSavedWorkouts());
+  /** Circuits from an in-progress draft detected on load; shown as a resume banner. */
+  const [resumableCircuits, setResumableCircuits] = useState<Circuit[] | null>(null);
 
   /** After saving or canceling CircuitBuilder from Home vs Circuits tab, return here. */
   const postBuilderMainViewRef = useRef<'dashboard' | 'circuits'>('dashboard');
@@ -123,6 +132,8 @@ const App: React.FC = () => {
     setViewingProgram(null);
     setActiveProgramContext(null);
     setEditingProgramCircuit(null);
+    setSavedWorkouts([]);
+    setResumableCircuits(null);
     setView('dashboard');
 
     try {
@@ -210,6 +221,7 @@ const App: React.FC = () => {
     nextHistory: WorkoutSession[],
     nextCustomExercises?: CustomExercise[],
     nextPrograms?: Program[],
+    nextSavedWorkouts?: SavedWorkout[],
   ) => {
     if (authStatus !== 'authed' || !idToken) return;
 
@@ -219,6 +231,7 @@ const App: React.FC = () => {
         history: WorkoutSession[];
         customExercises?: CustomExercise[];
         programs?: Program[];
+        savedWorkouts?: SavedWorkout[];
       } = {
         circuits: nextCircuits,
         history: nextHistory,
@@ -229,6 +242,9 @@ const App: React.FC = () => {
       if (nextPrograms !== undefined) {
         body.programs = nextPrograms;
       }
+      if (nextSavedWorkouts !== undefined) {
+        body.savedWorkouts = nextSavedWorkouts;
+      }
       const resp = await fetch('/api/data/save', {
         method: 'POST',
         headers: {
@@ -238,13 +254,13 @@ const App: React.FC = () => {
         body: JSON.stringify(body),
       });
       if (!resp.ok) {
-        setDataError('Couldn’t save. Changes may not sync.');
+      setDataError("Couldn't save. Changes may not sync.");
         console.warn('Failed to persist user data:', resp.status);
         return;
       }
       setDataError(null);
     } catch (e) {
-      setDataError('Couldn’t save. Changes may not sync.');
+      setDataError("Couldn't save. Changes may not sync.");
       console.warn('Failed to persist user data:', e);
     }
   };
@@ -268,12 +284,12 @@ const App: React.FC = () => {
 
         if (!resp.ok) {
           if (!cancelled) {
-            setDataError('Couldn’t load latest data. Showing cached.');
-            setCircuits(localCircuits);
-            setHistory(localHistory);
-            setView('dashboard');
-          }
-          return;
+        setDataError("Couldn't load latest data. Showing cached.");
+        setCircuits(localCircuits);
+        setHistory(localHistory);
+        setView('dashboard');
+      }
+      return;
         }
 
         if (!cancelled) setDataError(null);
@@ -283,6 +299,7 @@ const App: React.FC = () => {
           history: WorkoutSession[];
           customExercises?: CustomExercise[];
           programs?: Program[];
+          savedWorkouts?: SavedWorkout[];
         };
 
         const serverCircuits = Array.isArray(data.circuits) ? data.circuits : [];
@@ -322,12 +339,26 @@ const App: React.FC = () => {
           nextPrograms = localPrograms;
         }
 
+        // Restore saved workouts from server if present
+        const serverSavedWorkouts = Array.isArray(data.savedWorkouts) ? data.savedWorkouts as SavedWorkout[] : null;
+
         if (!cancelled) {
           setCircuits(nextCircuits);
           setHistory(nextHistory);
           setCustomExercises(nextCustomExercises);
           setPrograms(nextPrograms);
+          if (serverSavedWorkouts) setSavedWorkouts(serverSavedWorkouts);
           setView('dashboard');
+
+          // Detect in-progress draft and offer resume
+          const draft = getActiveWorkoutDraft();
+          if (draft) {
+            const draftIds = new Set(draft.circuitKey.split('|').filter(Boolean));
+            const matching = nextCircuits.filter(c => draftIds.has(c.id));
+            if (matching.length > 0 && activeWorkoutCircuitKey(matching) === draft.circuitKey) {
+              setResumableCircuits(matching);
+            }
+          }
         }
 
         // Upload if server was empty OR if we merged local-only sessions / program completions
@@ -342,10 +373,20 @@ const App: React.FC = () => {
       } catch (e) {
         console.warn('Failed to sync user data, falling back to local:', e);
         if (!cancelled) {
-          setDataError('Couldn’t load latest data. Showing cached.');
+          setDataError("Couldn't load latest data. Showing cached.");
           setCircuits(localCircuits);
           setHistory(localHistory);
           setView('dashboard');
+
+          // Still check for draft with local circuits on fallback
+          const draft = getActiveWorkoutDraft();
+          if (draft) {
+            const draftIds = new Set(draft.circuitKey.split('|').filter(Boolean));
+            const matching = localCircuits.filter(c => draftIds.has(c.id));
+            if (matching.length > 0 && activeWorkoutCircuitKey(matching) === draft.circuitKey) {
+              setResumableCircuits(matching);
+            }
+          }
         }
       }
     })();
@@ -399,7 +440,22 @@ const App: React.FC = () => {
     setActiveProgramContext(null);
     setActiveWorkoutMountId(n => n + 1);
     setActiveCircuits(selectedCircuits);
+    setResumableCircuits(null);
+    clearActiveWorkoutDraft();
     setView('active');
+  };
+
+  const handleResumeWorkout = () => {
+    if (!resumableCircuits?.length) return;
+    setResumableCircuits(null);
+    // Do NOT bump activeWorkoutMountId — we want the draft to be restored on mount
+    setActiveCircuits(resumableCircuits);
+    setView('active');
+  };
+
+  const handleDismissResume = () => {
+    clearActiveWorkoutDraft();
+    setResumableCircuits(null);
   };
 
   const handleToggleProgramDayComplete = (programId: string, week: number, day: number) => {
@@ -563,6 +619,27 @@ const App: React.FC = () => {
     void persistUserData(circuits, updated, customExercises);
   };
 
+  const handleCreateSavedWorkout = (workout: SavedWorkout) => {
+    const updated = [...savedWorkouts, workout];
+    setSavedWorkouts(updated);
+    saveSavedWorkouts(updated);
+    void persistUserData(circuits, history, customExercises, undefined, updated);
+  };
+
+  const handleUpdateSavedWorkout = (workout: SavedWorkout) => {
+    const updated = savedWorkouts.map(w => (w.id === workout.id ? workout : w));
+    setSavedWorkouts(updated);
+    saveSavedWorkouts(updated);
+    void persistUserData(circuits, history, customExercises, undefined, updated);
+  };
+
+  const handleDeleteSavedWorkout = (id: string) => {
+    const updated = savedWorkouts.filter(w => w.id !== id);
+    setSavedWorkouts(updated);
+    saveSavedWorkouts(updated);
+    void persistUserData(circuits, history, customExercises, undefined, updated);
+  };
+
   // Unique sorted category list derived from circuits — passed to CircuitBuilder for suggestions.
   const existingCategories = useMemo(
     () => [...new Set(circuits.map(c => c.category).filter((c): c is string => !!c))].sort(),
@@ -597,11 +674,14 @@ const App: React.FC = () => {
               setEditingCircuit(null);
               setView('builder');
             }}
-            onImportCSV={() => setView('upload')}
+          onImportCSV={() => setView('upload')}
             onOpenProgram={(program) => {
               setViewingProgram(program);
               setView('program');
             }}
+            resumableCircuits={resumableCircuits}
+            onResume={handleResumeWorkout}
+            onDismissResume={handleDismissResume}
           />
         );
       case 'circuits':
@@ -680,6 +760,17 @@ const App: React.FC = () => {
       }
       case 'history':
         return <HistoryView history={history} onDelete={handleDeleteSession} />;
+      case 'workouts':
+        return (
+          <SavedWorkoutsView
+            savedWorkouts={savedWorkouts}
+            circuits={circuits}
+            onStart={handleStartWorkout}
+            onCreate={handleCreateSavedWorkout}
+            onUpdate={handleUpdateSavedWorkout}
+            onDelete={handleDeleteSavedWorkout}
+          />
+        );
       case 'stats':
         return <StatsView history={history} customExercises={customExercises} />;
       case 'upload':
@@ -757,6 +848,9 @@ const App: React.FC = () => {
               setViewingProgram(program);
               setView('program');
             }}
+            resumableCircuits={resumableCircuits}
+            onResume={handleResumeWorkout}
+            onDismissResume={handleDismissResume}
           />
         );
     }
@@ -867,8 +961,8 @@ const App: React.FC = () => {
         {renderView()}
       </main>
 
-      {/* Bottom Navigation — 5 columns so Home / Circuits / New / History / Stats stay visually balanced */}
-      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-zinc-200/60 z-50 grid grid-cols-5 items-end pt-2 pb-[calc(0.65rem+var(--sab))] px-1">
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 w-full max-w-md md:max-w-3xl lg:max-w-6xl mx-auto glass-nav border-t border-zinc-200/60 z-50 grid grid-cols-6 items-end pt-2 pb-[calc(0.65rem+var(--sab))] px-1">
         <button
           type="button"
           onClick={() => setView('dashboard')}
@@ -929,6 +1023,17 @@ const App: React.FC = () => {
         >
           <BarChart3 className="w-5 h-5" />
           <span className="text-[10px] font-medium">Stats</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setView('workouts')}
+          className={`flex flex-col items-center justify-end gap-1 pb-1 min-h-[52px] transition-colors ${
+            view === 'workouts' ? 'text-blue-600' : 'text-zinc-400 hover:text-zinc-600'
+          }`}
+        >
+          <BookMarked className="w-5 h-5" />
+          <span className="text-[10px] font-medium">Workouts</span>
         </button>
       </nav>
     </div>

@@ -2,7 +2,7 @@ import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../serve
 import { ensureAppSchema, getSql } from '../../server/db.js';
 import { normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
 import { dedupeWorkoutHistoryByContent } from '../../services/workoutSessionFingerprint.js';
-import { WorkoutSession, CustomExercise, Program } from '../../types.js';
+import { WorkoutSession, CustomExercise, Program, SavedWorkout } from '../../types.js';
 
 const MAX_CUSTOM_EXERCISES = 500;
 const MAX_EXERCISE_NAME_LENGTH = 200;
@@ -51,6 +51,7 @@ type SaveBody = {
   history?: unknown;
   customExercises?: unknown;
   programs?: unknown;
+  savedWorkouts?: unknown;
 };
 
 function parseBody(body: unknown): SaveBody {
@@ -95,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await ensureAppSchema();
 
-    const { circuits, history, customExercises: rawCustomExercises, programs: rawPrograms } = parseBody(req.body);
+    const { circuits, history, customExercises: rawCustomExercises, programs: rawPrograms, savedWorkouts: rawSavedWorkouts } = parseBody(req.body);
     if (!Array.isArray(circuits) || !Array.isArray(history)) {
       res.status(400).send('Invalid body: expected { circuits: Circuit[], history: WorkoutSession[] }');
       return;
@@ -107,6 +108,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Optional: persist programs (stored as-is; circuits inside are self-contained)
     const programs: Program[] | undefined = Array.isArray(rawPrograms)
       ? (rawPrograms as Program[])
+      : undefined;
+    // Optional: persist saved workouts (stored as-is)
+    const savedWorkouts: SavedWorkout[] | undefined = Array.isArray(rawSavedWorkouts)
+      ? (rawSavedWorkouts as SavedWorkout[])
       : undefined;
 
     // Validate and deduplicate workout sessions by ID
@@ -139,6 +144,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : undefined;
     const programsJson = programs !== undefined
       ? JSON.parse(JSON.stringify(programs))
+      : undefined;
+    const savedWorkoutsJson = savedWorkouts !== undefined
+      ? JSON.parse(JSON.stringify(savedWorkouts))
       : undefined;
 
     if (customExercisesJson !== undefined && programsJson !== undefined) {
@@ -180,6 +188,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         do update set
           circuits = excluded.circuits,
           updated_at = now();
+      `;
+    }
+
+    // Persist saved workouts separately when provided (keeps the upsert branches above clean)
+    if (savedWorkoutsJson !== undefined) {
+      await sql`
+        update user_data
+        set saved_workouts = ${sql.json(savedWorkoutsJson)}, updated_at = now()
+        where sub = ${user.sub};
       `;
     }
 

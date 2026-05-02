@@ -1,5 +1,5 @@
 
-import { ActiveWorkoutDraft, Circuit, WorkoutSession, ExerciseLog, Program } from '../types';
+import { ActiveWorkoutDraft, Circuit, WorkoutSession, ExerciseLog, Program, SavedWorkout } from '../types';
 // Fix: STORAGE_KEYS is exported from constants.ts, not types.ts
 import { STORAGE_KEYS } from '../constants';
 import { dedupeWorkoutHistoryByContent } from './workoutSessionFingerprint';
@@ -18,6 +18,7 @@ export const clearUserStorage = () => {
     localStorage.removeItem(nsKey(STORAGE_KEYS.HISTORY));
     localStorage.removeItem(nsKey(STORAGE_KEYS.PROGRAMS));
     localStorage.removeItem(nsKey(STORAGE_KEYS.ACTIVE_WORKOUT_DRAFT));
+    localStorage.removeItem(nsKey(STORAGE_KEYS.SAVED_WORKOUTS));
   } catch {
     // ignore
   }
@@ -164,6 +165,23 @@ export const savePrograms = (programs: Program[]) => {
 export const getPrograms = (): Program[] => {
   try {
     const data = localStorage.getItem(nsKey(STORAGE_KEYS.PROGRAMS));
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveSavedWorkouts = (savedWorkouts: SavedWorkout[]): void => {
+  try {
+    localStorage.setItem(nsKey(STORAGE_KEYS.SAVED_WORKOUTS), JSON.stringify(savedWorkouts));
+  } catch {
+    // ignore
+  }
+};
+
+export const getSavedWorkouts = (): SavedWorkout[] => {
+  try {
+    const data = localStorage.getItem(nsKey(STORAGE_KEYS.SAVED_WORKOUTS));
     return data ? JSON.parse(data) : [];
   } catch {
     return [];

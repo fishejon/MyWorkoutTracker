@@ -125,4 +125,5 @@ export const STORAGE_KEYS = {
   SETTINGS: 'myworkouttracker_settings',
   PROGRAMS: 'myworkouttracker_programs',
   ACTIVE_WORKOUT_DRAFT: 'myworkouttracker_active_draft',
+  SAVED_WORKOUTS: 'myworkouttracker_saved_workouts',
 };

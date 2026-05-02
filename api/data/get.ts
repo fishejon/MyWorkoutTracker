@@ -2,7 +2,7 @@ import { checkAllowList, getBearerToken, verifyGoogleIdToken } from '../../serve
 import { ensureAppSchema, getSql } from '../../server/db.js';
 import { denormalizeWorkouts, normalizeWorkoutSession } from '../../server/workoutDataTransform.js';
 import { WorkoutRow, RoundRow, ExerciseSetRow } from '../../server/workoutDataTransform.js';
-import { WorkoutSession, CustomExercise, Program } from '../../types.js';
+import { WorkoutSession, CustomExercise, Program, SavedWorkout } from '../../types.js';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -59,8 +59,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       history: unknown;
       custom_exercises?: unknown;
       programs?: unknown;
+      saved_workouts?: unknown;
     }[]>`
-      select circuits, history, custom_exercises, programs
+      select circuits, history, custom_exercises, programs, saved_workouts
       from user_data
       where sub = ${user.sub}
     `;
@@ -85,6 +86,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         typeof o.name === 'string' &&
         typeof o.totalWeeks === 'number' &&
         Array.isArray(o.schedule)
+      );
+    });
+
+    // Read saved workouts
+    const rawSavedWorkouts = userDataRows.length > 0 && Array.isArray(userDataRows[0].saved_workouts)
+      ? (userDataRows[0].saved_workouts as unknown[])
+      : [];
+    const savedWorkouts = rawSavedWorkouts.filter((item): item is SavedWorkout => {
+      if (!item || typeof item !== 'object') return false;
+      const o = item as Record<string, unknown>;
+      return (
+        typeof o.id === 'string' &&
+        typeof o.name === 'string' &&
+        Array.isArray(o.circuitIds) &&
+        typeof o.createdAt === 'string'
       );
     });
 
@@ -239,7 +255,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           `;
         }
         
-        res.status(200).json({ circuits, history, customExercises, programs });
+        res.status(200).json({ circuits, history, customExercises, programs, savedWorkouts });
         return;
       } else {
         // Migration ran but no data was created - don't clear old data
@@ -258,10 +274,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // If we have old history but migration didn't run, return it
       if (oldHistory.length > 0) {
         if (isDev) console.log(`[Migration Debug] Returning old history format as fallback`);
-        res.status(200).json({ circuits, history: oldHistory, customExercises, programs });
+      res.status(200).json({ circuits, history: oldHistory, customExercises, programs, savedWorkouts });
         return;
       }
-      res.status(200).json({ circuits, history: [], customExercises, programs });
+      res.status(200).json({ circuits, history: [], customExercises, programs, savedWorkouts });
       return;
     }
 
@@ -311,6 +327,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       history,
       customExercises,
       programs,
+      savedWorkouts,
     });
   } catch (err) {
     console.error('data/get error', err);
