@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Circuit, CircuitExercise, ExerciseType, Program, ProgramWorkoutDay } from '../types';
+import { resolveDisplayName } from '../utils/exerciseCanon';
 import { Upload, FileText, X, AlertCircle, CheckCircle2, ChevronLeft } from 'lucide-react';
 
 interface ProgramUploadProps {
@@ -95,7 +96,7 @@ function buildCircuit(circuitName: string, exerciseRows: CsvRow[]): Circuit {
   const exercises: CircuitExercise[] = exerciseRows.map(row => {
     const ex: CircuitExercise = {
       id: `csv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      name: row.exercise_name,
+      name: resolveDisplayName(row.exercise_name),
       type: row.type,
       defaultSets: row.sets,
       sets: row.sets,

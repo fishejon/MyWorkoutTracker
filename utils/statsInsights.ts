@@ -1,5 +1,10 @@
 import { DEFAULT_EXERCISES, EXERCISE_GROUPS } from '../constants';
 import { CustomExercise, ExerciseLog, WorkoutSession } from '../types';
+import {
+  canonicalizeExercise,
+  normalizeExerciseName,
+  resolveDisplayName,
+} from './exerciseCanon';
 
 export type StrengthMode = 'bestSet' | 'top3Avg' | 'e1rm';
 export type TimeRange = '4w' | '8w' | '12w' | 'all';
@@ -43,17 +48,6 @@ const TARGET_SESSIONS_PER_WEEK = 4;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const LOWER_BODY_GROUP_HINTS = ['Legs', 'Quads', 'Hams', 'Calves'];
 
-const EXERCISE_ALIASES: Record<string, string> = {
-  benchpress: 'barbellbenchpress',
-  flatbenchpress: 'barbellbenchpress',
-  barbellbench: 'barbellbenchpress',
-  squat: 'barbellsquat',
-  backsquat: 'barbellsquat',
-  deadlift: 'conventionaldeadlift',
-  barbelldeadlift: 'conventionaldeadlift',
-  overheadbarbellpress: 'overheadpress',
-};
-
 const toDate = (value: string) => new Date(value);
 
 const sortByDateAsc = (sessions: WorkoutSession[]) =>
@@ -68,13 +62,6 @@ const weekStart = (date: Date) => {
   copy.setDate(copy.getDate() - day);
   copy.setHours(0, 0, 0, 0);
   return copy;
-};
-
-const normalizeExerciseName = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-const canonicalizeExercise = (name: string): string => {
-  const normalized = normalizeExerciseName(name);
-  return EXERCISE_ALIASES[normalized] ?? normalized;
 };
 
 const getTimeRangeStart = (now: Date, range: TimeRange): Date | null => {
@@ -363,7 +350,7 @@ export const getAvailableWeightLifts = (sessions: WorkoutSession[]) => {
     session.logs.forEach(log => {
       if (log.type !== 'weight') return;
       const key = canonicalizeExercise(log.exerciseName);
-      if (!names.has(key)) names.set(key, log.exerciseName);
+      if (!names.has(key)) names.set(key, resolveDisplayName(log.exerciseName));
     });
   });
   return [...names.values()].sort((a, b) => a.localeCompare(b));
@@ -412,4 +399,4 @@ export const buildStatsInsights = (params: {
   };
 };
 
-export { canonicalizeExercise, normalizeExerciseName };
+export { canonicalizeExercise, normalizeExerciseName, resolveDisplayName };

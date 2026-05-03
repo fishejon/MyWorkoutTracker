@@ -19,6 +19,11 @@ const rawGroups: ExerciseGroup[] = [
       { id: 'cp8', name: 'Sumo Deadlift', type: 'weight', defaultSets: 3 },
       { id: 'cp9', name: 'Power Clean', type: 'weight', defaultSets: 3 },
       { id: 'cp10', name: 'Front Squat', type: 'weight', defaultSets: 3 },
+      { id: 'cp11', name: 'Trap Bar Deadlift', type: 'weight', defaultSets: 3 },
+      { id: 'cp12', name: 'Hang Clean', type: 'weight', defaultSets: 3 },
+      { id: 'cp13', name: 'Snatch', type: 'weight', defaultSets: 3 },
+      { id: 'cp14', name: 'Push Press', type: 'weight', defaultSets: 3 },
+      { id: 'cp15', name: 'Zercher Squat', type: 'weight', defaultSets: 3 },
     ]
   },
   {
@@ -32,6 +37,9 @@ const rawGroups: ExerciseGroup[] = [
       { id: 'c6', name: 'Machine Chest Press', type: 'weight', defaultSets: 3 },
       { id: 'c7', name: 'Decline Bench Press', type: 'weight', defaultSets: 3 },
       { id: 'c8', name: 'Pec Deck Fly', type: 'weight', defaultSets: 3 },
+      { id: 'c9', name: 'Incline Barbell Press', type: 'weight', defaultSets: 3 },
+      { id: 'c10', name: 'Landmine Press', type: 'weight', defaultSets: 3 },
+      { id: 'c11', name: 'Dumbbell Bench Press', type: 'weight', defaultSets: 3 },
     ]
   },
   {
@@ -46,6 +54,11 @@ const rawGroups: ExerciseGroup[] = [
       { id: 'b7', name: 'Back Hyperextensions', type: 'reps', defaultSets: 3 },
       { id: 'b8', name: 'T-Bar Row', type: 'weight', defaultSets: 3 },
       { id: 'b9', name: 'Straight Arm Pulldown', type: 'weight', defaultSets: 3 },
+      { id: 'b10', name: 'Pendlay Row', type: 'weight', defaultSets: 3 },
+      { id: 'b11', name: 'Chest Supported Row', type: 'weight', defaultSets: 3 },
+      { id: 'b12', name: 'Rack Pulls', type: 'weight', defaultSets: 3 },
+      { id: 'b13', name: 'Close Grip Lat Pulldown', type: 'weight', defaultSets: 3 },
+      { id: 'b14', name: 'Meadows Row', type: 'weight', defaultSets: 3 },
     ]
   },
   {
@@ -61,6 +74,13 @@ const rawGroups: ExerciseGroup[] = [
       { id: 'l8', name: 'Hack Squat', type: 'weight', defaultSets: 3 },
       { id: 'l9', name: 'Calf Raises (Seated)', type: 'reps', defaultSets: 4 },
       { id: 'l10', name: 'Stiff Leg Deadlift', type: 'weight', defaultSets: 3 },
+      { id: 'l11', name: 'Hip Thrust', type: 'weight', defaultSets: 3 },
+      { id: 'l12', name: 'RDL', type: 'weight', defaultSets: 3 },
+      { id: 'l13', name: 'Walking Lunges', type: 'reps', defaultSets: 3 },
+      { id: 'l14', name: 'Box Squat', type: 'weight', defaultSets: 3 },
+      { id: 'l15', name: 'Nordic Curl', type: 'reps', defaultSets: 3 },
+      { id: 'l16', name: 'Sissy Squat', type: 'reps', defaultSets: 3 },
+      { id: 'l17', name: 'Step Ups', type: 'weight', defaultSets: 3 },
     ]
   },
   {
@@ -72,6 +92,10 @@ const rawGroups: ExerciseGroup[] = [
       { id: 's4', name: 'Upright Row', type: 'weight', defaultSets: 3 },
       { id: 's5', name: 'Rear Delt Flyes', type: 'weight', defaultSets: 3 },
       { id: 's6', name: 'Smith Machine Press', type: 'weight', defaultSets: 3 },
+      { id: 's7', name: 'Cable Lateral Raises', type: 'weight', defaultSets: 3 },
+      { id: 's8', name: 'Lu Raises', type: 'weight', defaultSets: 3 },
+      { id: 's9', name: 'Dumbbell Shoulder Press', type: 'weight', defaultSets: 3 },
+      { id: 's10', name: 'Reverse Pec Deck', type: 'weight', defaultSets: 3 },
     ]
   },
   {
@@ -85,6 +109,13 @@ const rawGroups: ExerciseGroup[] = [
       { id: 'a6', name: 'Dips (Tricep Focus)', type: 'reps', defaultSets: 3 },
       { id: 'a7', name: 'Concentration Curls', type: 'weight', defaultSets: 3 },
       { id: 'a8', name: 'Overhead Extension', type: 'weight', defaultSets: 3 },
+      { id: 'a9', name: 'EZ Bar Curls', type: 'weight', defaultSets: 3 },
+      { id: 'a10', name: 'Spider Curls', type: 'weight', defaultSets: 3 },
+      { id: 'a11', name: 'Cable Curls', type: 'weight', defaultSets: 3 },
+      { id: 'a12', name: 'Close Grip Bench', type: 'weight', defaultSets: 3 },
+      { id: 'a13', name: 'Tricep Kickbacks', type: 'weight', defaultSets: 3 },
+      { id: 'a14', name: 'Incline Dumbbell Curl', type: 'weight', defaultSets: 3 },
+      { id: 'a15', name: 'Bayesian Cable Curl', type: 'weight', defaultSets: 3 },
     ]
   },
   {
@@ -97,6 +128,12 @@ const rawGroups: ExerciseGroup[] = [
       { id: 'cr5', name: 'Ab Wheel Rollouts', type: 'reps', defaultSets: 3 },
       { id: 'cr6', name: 'Dead Bug', type: 'reps', defaultSets: 3 },
       { id: 'cr7', name: 'Mountain Climbers', type: 'reps', defaultSets: 3 },
+      { id: 'cr8', name: 'Cable Woodchops', type: 'weight', defaultSets: 3 },
+      { id: 'cr9', name: 'Pallof Press', type: 'weight', defaultSets: 3 },
+      { id: 'cr10', name: 'Suitcase Carry', type: 'duration', defaultSets: 3 },
+      { id: 'cr11', name: 'Copenhagen Plank', type: 'duration', defaultSets: 3 },
+      { id: 'cr12', name: 'Dragon Flag', type: 'reps', defaultSets: 3 },
+      { id: 'cr13', name: 'Side Plank', type: 'duration', defaultSets: 3 },
     ]
   },
   {
@@ -107,6 +144,13 @@ const rawGroups: ExerciseGroup[] = [
       { id: 'cd3', name: 'Rowing', type: 'duration', defaultSets: 1 },
       { id: 'cd4', name: 'Jump Rope', type: 'duration', defaultSets: 3 },
       { id: 'cd5', name: 'Stair Climber', type: 'duration', defaultSets: 1 },
+      { id: 'cd6', name: 'Battle Ropes', type: 'duration', defaultSets: 3 },
+      { id: 'cd7', name: 'Box Jumps', type: 'reps', defaultSets: 3 },
+      { id: 'cd8', name: 'Assault Bike', type: 'duration', defaultSets: 1 },
+      { id: 'cd9', name: 'Swimming', type: 'duration', defaultSets: 1 },
+      { id: 'cd10', name: 'Elliptical', type: 'duration', defaultSets: 1 },
+      { id: 'cd11', name: 'Hiking', type: 'duration', defaultSets: 1 },
+      { id: 'cd12', name: 'Sled Push', type: 'duration', defaultSets: 3 },
     ]
   }
 ];
