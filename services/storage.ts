@@ -3,6 +3,7 @@ import { ActiveWorkoutDraft, Circuit, WorkoutSession, ExerciseLog, Program, Save
 // Fix: STORAGE_KEYS is exported from constants.ts, not types.ts
 import { STORAGE_KEYS } from '../constants';
 import { dedupeWorkoutHistoryByContent } from './workoutSessionFingerprint';
+import { canonicalizeExercise, resolveDisplayName } from '../utils/exerciseCanon';
 
 let storageNamespace: string | null = null;
 
@@ -134,6 +135,34 @@ function migrateHistory(sessions: WorkoutSession[]): WorkoutSession[] {
   );
 }
 
+/**
+ * One-time migration: rewrite stored exerciseName values to their canonical
+ * display name where a confident match exists. This consolidates duplicates
+ * caused by different casing or known aliases (e.g. "bench press" → "Barbell
+ * Bench Press"). Returns { sessions, changed } so callers know whether to
+ * persist the result.
+ */
+function migrateExerciseNames(sessions: WorkoutSession[]): { sessions: WorkoutSession[]; changed: boolean } {
+  let changed = false;
+  const migrated = sessions.map(session => {
+    let sessionChanged = false;
+    const logs = session.logs.map(log => {
+      const resolved = resolveDisplayName(log.exerciseName);
+      if (resolved !== log.exerciseName) {
+        sessionChanged = true;
+        return { ...log, exerciseName: resolved };
+      }
+      return log;
+    });
+    if (sessionChanged) {
+      changed = true;
+      return { ...session, logs };
+    }
+    return session;
+  });
+  return { sessions: migrated, changed };
+}
+
 export const saveHistory = (history: WorkoutSession[]) => {
   localStorage.setItem(nsKey(STORAGE_KEYS.HISTORY), JSON.stringify(history));
 };
@@ -148,8 +177,10 @@ export const getHistory = (): WorkoutSession[] => {
   try {
     const data = localStorage.getItem(nsKey(STORAGE_KEYS.HISTORY));
     const raw = data ? migrateHistory(JSON.parse(data)) : [];
-    const deduped = dedupeWorkoutHistoryByContent(raw);
-    if (deduped.length !== raw.length) {
+    // Retroactive: normalise exercise names to canonical display names
+    const { sessions: nameMigrated, changed: namesChanged } = migrateExerciseNames(raw);
+    const deduped = dedupeWorkoutHistoryByContent(nameMigrated);
+    if (namesChanged || deduped.length !== nameMigrated.length) {
       localStorage.setItem(nsKey(STORAGE_KEYS.HISTORY), JSON.stringify(deduped));
     }
     return deduped;
@@ -204,6 +235,7 @@ export const getLastWorkoutDataForExercise = (
   history?: WorkoutSession[]
 ): ExerciseLog | null => {
   const workoutHistory = history ?? getHistory();
+  const targetKey = canonicalizeExercise(exerciseName);
   
   // Search through history (already sorted most recent first)
   for (const session of workoutHistory) {
@@ -212,8 +244,8 @@ export const getLastWorkoutDataForExercise = (
       if (log.exerciseId === exerciseId) {
         return log;
       }
-      // Fallback to exerciseName matching
-      if (log.exerciseName === exerciseName) {
+      // Fallback to canonical exercise name matching (handles case/alias differences)
+      if (canonicalizeExercise(log.exerciseName) === targetKey) {
         return log;
       }
     }

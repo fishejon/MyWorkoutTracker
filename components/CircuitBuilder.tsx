@@ -2,7 +2,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Circuit, CircuitExercise, ExerciseType, Exercise, CustomExercise } from '../types';
 import { EXERCISE_GROUPS } from '../constants';
-import { Search, Plus, X, ChevronRight, Layers, ArrowLeft } from 'lucide-react';
+import { canonicalizeExercise, resolveDisplayName } from '../utils/exerciseCanon';
+import { EXERCISE_DESCRIPTIONS } from '../data/exerciseDescriptions';
+import { Search, Plus, X, ChevronRight, Layers, ArrowLeft, HelpCircle } from 'lucide-react';
 
 interface CircuitBuilderProps {
   initialCircuit?: Circuit | null;
@@ -97,11 +99,16 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
     }
   };
 
+  const [customDuplicateHint, setCustomDuplicateHint] = useState<string | null>(null);
+  const [infoExercise, setInfoExercise] = useState<Exercise | null>(null);
+
   const addCustomExercise = () => {
     if (!customName.trim() || !customMuscleGroup) return;
+    // Resolve to canonical display name if one exists in the library
+    const resolved = resolveDisplayName(customName.trim());
     const newEx: CustomExercise = {
       id: `custom-${Date.now()}`,
-      name: customName.trim(),
+      name: resolved,
       type: customType,
       defaultSets: 3,
       muscleGroup: customMuscleGroup,
@@ -110,6 +117,7 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
     onSaveCustomExercise(newEx);
     setCustomName('');
     setCustomMuscleGroup(null);
+    setCustomDuplicateHint(null);
     setIsCustomMode(false);
   };
 
@@ -235,8 +243,22 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
                 placeholder="Exercise name..."
                 className="w-full px-4 py-3 bg-zinc-700/50 border border-zinc-600/50 rounded-xl outline-none placeholder:text-zinc-400 font-semibold"
                 value={customName}
-                onChange={(e) => setCustomName(e.target.value)}
+                onChange={(e) => {
+                  setCustomName(e.target.value);
+                  const val = e.target.value.trim();
+                  if (val.length >= 3) {
+                    const resolved = resolveDisplayName(val);
+                    setCustomDuplicateHint(
+                      resolved !== val ? `Did you mean "${resolved}"?` : null
+                    );
+                  } else {
+                    setCustomDuplicateHint(null);
+                  }
+                }}
               />
+              {customDuplicateHint && (
+                <p className="text-xs text-amber-400 font-medium mt-1">{customDuplicateHint}</p>
+              )}
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 block mb-2">Muscle group</span>
                 <div className="flex flex-wrap gap-2">
@@ -317,20 +339,33 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm divide-y divide-slate-50 overflow-hidden">
                 {currentGroupExercises.map(ex => {
                   const isSelected = !!selectedExercises.find(s => s.id === ex.id);
+                  const canonKey = canonicalizeExercise(ex.name);
+                  const hasInfo = !!EXERCISE_DESCRIPTIONS[canonKey];
                   return (
-                    <button
-                      key={ex.id}
-                      onClick={() => addExercise(ex)}
-                      className="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-50 transition-colors group active:bg-zinc-100"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-slate-700">{ex.name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">{ex.type}</p>
-                      </div>
-                      <div className={`p-1.5 rounded-full transition-colors ${isSelected ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-zinc-100 group-hover:text-sky-500'}`}>
-                        <Plus className="w-4 h-4" />
-                      </div>
-                    </button>
+                    <div key={ex.id} className="flex items-center hover:bg-zinc-50 transition-colors group active:bg-zinc-100">
+                      {hasInfo && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setInfoExercise(ex); }}
+                          className="pl-4 pr-1 py-4 text-slate-300 hover:text-sky-500 transition-colors flex-shrink-0"
+                          aria-label={`How to: ${ex.name}`}
+                        >
+                          <HelpCircle className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => addExercise(ex)}
+                        className={`flex-1 flex items-center justify-between ${hasInfo ? 'pl-2' : 'pl-4'} pr-4 py-4 text-left`}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-slate-700">{ex.name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase">{ex.type}</p>
+                        </div>
+                        <div className={`p-1.5 rounded-full transition-colors ${isSelected ? 'bg-zinc-900 text-white' : 'bg-slate-100 text-slate-400 group-hover:bg-zinc-100 group-hover:text-sky-500'}`}>
+                          <Plus className="w-4 h-4" />
+                        </div>
+                      </button>
+                    </div>
                   );
                 })}
               </div>
@@ -338,6 +373,63 @@ const CircuitBuilder: React.FC<CircuitBuilderProps> = ({
           )}
         </div>
       </div>
+
+      {/* Exercise Info Dialog */}
+      {infoExercise && (() => {
+        const desc = EXERCISE_DESCRIPTIONS[canonicalizeExercise(infoExercise.name)];
+        if (!desc) { setInfoExercise(null); return null; }
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setInfoExercise(null)} />
+            <div className="relative w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+              <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100 flex-shrink-0">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">{infoExercise.name}</h2>
+                  <p className="text-[10px] text-sky-500 font-bold uppercase tracking-wider">{infoExercise.type}</p>
+                </div>
+                <button type="button" onClick={() => setInfoExercise(null)} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg transition-colors" aria-label="Close">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                <div>
+                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">How to perform</h3>
+                  <ol className="space-y-2">
+                    {desc.steps.map((step, i) => (
+                      <li key={i} className="flex gap-2.5 text-sm text-slate-700">
+                        <span className="flex-shrink-0 w-5 h-5 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5">{i + 1}</span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+                {desc.tips && desc.tips.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Tips</h3>
+                    <ul className="space-y-1.5">
+                      {desc.tips.map((tip, i) => (
+                        <li key={i} className="flex gap-2 text-sm text-slate-600">
+                          <span className="text-amber-500 flex-shrink-0">•</span>
+                          <span>{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="px-5 pb-5 pt-3 border-t border-slate-100 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setInfoExercise(null)}
+                  className="w-full py-3 bg-zinc-900 text-white rounded-xl font-semibold transition-colors active:scale-[0.98]"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Footer */}
       <div className="p-4 bg-white border-t border-slate-200 sticky bottom-0 z-40 flex flex-col gap-3 shadow-2xl">
